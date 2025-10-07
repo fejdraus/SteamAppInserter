@@ -1,0 +1,8 @@
+{
+    "": "https://raw.githubusercontent.com/SteamClientHomebrew/Millennium/main/src/sys/plugin-schema.json",
+    "name": "steam-app-inserter",
+    "common_name": "Steam App Inserter",
+    "description": "Insert apps to steam via steamtools lua.",
+    "version": "1.0.0",
+    "include": ["public"]
+}
