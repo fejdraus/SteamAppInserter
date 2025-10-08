@@ -29,12 +29,197 @@ const deletegame = callable<[{ id: string }], boolean>('Backend.deletelua');
 const checkPirated = callable<[{ id: string }], boolean>('Backend.checkpirated');
 const restartt = callable<[], boolean>('Backend.restart');
 
-const presentMessage = async (title: string, message: string) => {
-    if (typeof ShowMessageBox === 'function') {
-        await Promise.resolve(ShowMessageBox({ title, message }));
-    } else {
-        alert(message);
+const createDialogButton = (label: string, variant: 'primary' | 'secondary' = 'primary'): HTMLButtonElement => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = variant === 'primary' ? 'btnv6_blue_hoverfade btn_medium' : 'btnv6_lightblue_blue btn_medium';
+    button.textContent = label;
+    return button;
+};
+
+const createDialogShell = (title: string, subtitle?: string) => {
+    if (!document.body) {
+        throw new Error('Document body not ready for dialog rendering.');
     }
+
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.background = 'rgba(0, 0, 0, 0.65)';
+    overlay.style.zIndex = '9999';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'flex-start';
+    overlay.style.justifyContent = 'center';
+    overlay.style.paddingTop = '8vh';
+
+    const dialog = document.createElement('div');
+    dialog.style.background = '#171a21';
+    dialog.style.color = '#ffffff';
+    dialog.style.padding = '24px';
+    dialog.style.borderRadius = '8px';
+    dialog.style.maxWidth = '520px';
+    dialog.style.width = 'calc(100% - 48px)';
+    dialog.style.boxShadow = '0 12px 48px rgba(0, 0, 0, 0.45)';
+    dialog.style.fontFamily = '"Motiva Sans", Arial, sans-serif';
+    dialog.style.outline = 'none';
+    dialog.tabIndex = -1;
+
+    const titleEl = document.createElement('h2');
+    titleEl.textContent = title;
+    titleEl.style.margin = '0 0 8px 0';
+    dialog.appendChild(titleEl);
+
+    if (subtitle) {
+        const subtitleEl = document.createElement('p');
+        subtitleEl.textContent = subtitle;
+        subtitleEl.style.marginTop = '0';
+        subtitleEl.style.fontSize = '14px';
+        subtitleEl.style.opacity = '0.85';
+        dialog.appendChild(subtitleEl);
+    }
+
+    const content = document.createElement('div');
+    content.style.margin = '16px 0';
+    dialog.appendChild(content);
+
+    const actions = document.createElement('div');
+    actions.style.display = 'flex';
+    actions.style.justifyContent = 'flex-end';
+    actions.style.gap = '12px';
+    actions.style.borderTop = '1px solid rgba(255, 255, 255, 0.08)';
+    actions.style.marginTop = '16px';
+    actions.style.paddingTop = '16px';
+    dialog.appendChild(actions);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    const stopPropagation = (event: MouseEvent) => event.stopPropagation();
+    dialog.addEventListener('click', stopPropagation);
+
+    let closed = false;
+    const close = () => {
+        if (closed) return;
+        closed = true;
+        dialog.removeEventListener('click', stopPropagation);
+        try {
+            overlay.remove();
+        } catch {
+            const parent = overlay.parentNode;
+            if (parent) parent.removeChild(overlay);
+        }
+    };
+
+    overlay.addEventListener('click', () => {
+        // Prevent accidental background clicks from doing anything.
+    });
+
+    requestAnimationFrame(() => {
+        dialog.focus();
+    });
+
+    return { overlay, dialog, content, actions, close };
+};
+
+type ConfirmationOptions = {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+};
+
+const presentMessage = async (title: string, message: string): Promise<void> => {
+    if (!document.body) {
+        if (typeof ShowMessageBox === 'function') {
+            await Promise.resolve(ShowMessageBox({ title, message }));
+            return;
+        }
+        alert(message);
+        return;
+    }
+
+    await new Promise<void>((resolve) => {
+        const { dialog, content, actions, close } = createDialogShell(title);
+
+        const text = document.createElement('p');
+        text.textContent = message;
+        text.style.margin = '0';
+        text.style.fontSize = '14px';
+        text.style.opacity = '0.85';
+        content.appendChild(text);
+
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            close();
+            resolve();
+        };
+
+        const okButton = createDialogButton('OK', 'primary');
+        okButton.addEventListener('click', finish);
+        actions.appendChild(okButton);
+
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey)) {
+                event.preventDefault();
+                finish();
+            }
+        };
+
+        dialog.addEventListener('keydown', handleKey);
+        requestAnimationFrame(() => okButton.focus());
+    });
+};
+
+const presentConfirmation = async ({ title, message, confirmLabel = 'OK', cancelLabel = 'Cancel' }: ConfirmationOptions): Promise<boolean> => {
+    if (!document.body) {
+        return confirm(message);
+    }
+
+    return await new Promise<boolean>((resolve) => {
+        const { dialog, content, actions, close } = createDialogShell(title);
+
+        const text = document.createElement('p');
+        text.textContent = message;
+        text.style.margin = '0';
+        text.style.fontSize = '14px';
+        text.style.opacity = '0.85';
+        content.appendChild(text);
+
+        let settled = false;
+        const finish = (value: boolean) => {
+            if (settled) return;
+            settled = true;
+            close();
+            resolve(value);
+        };
+
+        const cancelButton = createDialogButton(cancelLabel, 'secondary');
+        cancelButton.addEventListener('click', () => finish(false));
+
+        const confirmButton = createDialogButton(confirmLabel, 'primary');
+        confirmButton.addEventListener('click', () => finish(true));
+
+        actions.appendChild(cancelButton);
+        actions.appendChild(confirmButton);
+
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                finish(false);
+            } else if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
+                event.preventDefault();
+                finish(true);
+            }
+        };
+
+        dialog.addEventListener('keydown', handleKey);
+        requestAnimationFrame(() => confirmButton.focus());
+    });
 };
 
 const toNonEmptyString = (value: unknown, fallback = ''): string => {
@@ -137,46 +322,19 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
     if (!normalized.length || !document.body) return false;
 
     return await new Promise<boolean>((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.style.position = 'fixed';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.background = 'rgba(0, 0, 0, 0.65)';
-        overlay.style.zIndex = '9999';
-        overlay.style.display = 'flex';
-        overlay.style.alignItems = 'flex-start';
-        overlay.style.justifyContent = 'center';
-        overlay.style.paddingTop = '8vh';
+        const { dialog, content, actions, close } = createDialogShell(
+            'Select DLC to add',
+            "Select DLC to add. Uncheck any you don't want to add."
+        );
 
-        const dialog = document.createElement('div');
-        dialog.style.background = '#171a21';
-        dialog.style.color = '#ffffff';
-        dialog.style.padding = '24px';
-        dialog.style.borderRadius = '8px';
-        dialog.style.maxWidth = '520px';
-        dialog.style.width = 'calc(100% - 48px)';
-        dialog.style.boxShadow = '0 12px 48px rgba(0, 0, 0, 0.45)';
-        dialog.style.fontFamily = '"Motiva Sans", Arial, sans-serif';
-
-        const title = document.createElement('h2');
-        title.textContent = 'Select DLC to add';
-        title.style.margin = '0 0 8px 0';
-        dialog.appendChild(title);
-
-        const subtitle = document.createElement('p');
-        subtitle.textContent = 'Select DLC to add. Uncheck any you don\'t want to add.';
-        subtitle.style.marginTop = '0';
-        subtitle.style.fontSize = '14px';
-        subtitle.style.opacity = '0.85';
-        dialog.appendChild(subtitle);
+        content.style.margin = '0';
 
         const list = document.createElement('div');
         list.style.maxHeight = '40vh';
         list.style.overflowY = 'auto';
         list.style.margin = '16px 0';
         list.style.paddingRight = '8px';
+        content.appendChild(list);
 
         normalized.forEach((entry) => {
             const label = document.createElement('label');
@@ -204,44 +362,23 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
             }
             secondary.textContent = parts.join(' - ');
             textContainer.appendChild(mainLine);
-            if (secondary.textContent) textContainer.appendChild(secondary);
+            if (secondary.textContent) {
+                textContainer.appendChild(secondary);
+            }
 
             label.appendChild(checkbox);
             label.appendChild(textContainer);
             list.appendChild(label);
         });
 
-        dialog.appendChild(list);
+        const cancelButton = createDialogButton('Cancel', 'secondary');
+        const confirmButton = createDialogButton('Add selected/Remove unselected', 'primary');
 
-        const actions = document.createElement('div');
-        actions.style.display = 'flex';
-        actions.style.justifyContent = 'flex-end';
-        actions.style.gap = '12px';
-        actions.style.marginTop = '16px';
-        actions.style.paddingTop = '16px';
-
-        const cancelButton = document.createElement('button');
-        cancelButton.type = 'button';
-        cancelButton.className = 'btnv6_lightblue_blue btn_medium';
-        cancelButton.textContent = 'Cancel';
-
-        const confirmButton = document.createElement('button');
-        confirmButton.type = 'button';
-        confirmButton.className = 'btnv6_blue_hoverfade btn_medium';
-        confirmButton.textContent = 'Add selected/Remove unselected';
-
-        let overlayClosed = false;
-        const closeOverlay = (wasInstalled: boolean) => {
-            if (overlayClosed) return;
-            overlayClosed = true;
-            try {
-                overlay.remove();
-            } catch {
-                const parent = overlay.parentNode;
-                if (parent) {
-                    parent.removeChild(overlay);
-                }
-            }
+        let settled = false;
+        const finish = (wasInstalled: boolean) => {
+            if (settled) return;
+            settled = true;
+            close();
             resolve(wasInstalled);
         };
 
@@ -256,7 +393,7 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         };
 
         cancelButton.addEventListener('click', () => {
-            closeOverlay(false);
+            finish(false);
         });
 
         confirmButton.addEventListener('click', async () => {
@@ -269,28 +406,38 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
                 const response = normalizeInstallDlcsResult(responseRaw);
 
                 if (response.success) {
-                    closeOverlay(true);
+                    finish(true);
                 } else {
                     setDisabled(false);
                     await presentMessage('Adding failed', response.details || 'Failed to adding selected DLC');
                 }
             } catch (error) {
                 setDisabled(false);
-                await presentMessage('Adding failed', `Error: ${error instanceof Error ? error.message : error}`);
+                await presentMessage('Adding failed', 'Error: ' + (error instanceof Error ? error.message : error));
             }
         });
 
         actions.appendChild(cancelButton);
         actions.appendChild(confirmButton);
-        dialog.appendChild(actions);
 
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                finish(false);
+            }
+        };
+
+        dialog.addEventListener('keydown', handleKey);
     });
 };
 
 const confirmBaseGameInstall = async (): Promise<boolean> => {
-    return confirm('This game has no DLC. Do you want to add it to your library?');
+    return presentConfirmation({
+        title: 'Add to library',
+        message: 'This game has no DLC. Do you want to add it to your library?',
+        confirmLabel: 'Add game',
+        cancelLabel: 'Cancel',
+    });
 };
 
 export default function WebkitMain() {
@@ -342,7 +489,14 @@ export default function WebkitMain() {
                 removeBtn.addEventListener("click", async (e) => {
                     e.preventDefault();
 
-                    if (!confirm("Are you sure you want to remove this game from your library?")) {
+                    const confirmed = await presentConfirmation({
+                        title: 'Remove from library',
+                        message: 'Are you sure you want to remove this game from your library?',
+                        confirmLabel: 'Remove',
+                        cancelLabel: 'Cancel',
+                    });
+
+                    if (!confirmed) {
                         return;
                     }
 
@@ -352,7 +506,12 @@ export default function WebkitMain() {
                     try {
                         const success = await deletegame({ id: appId });
                         if (success) {
-                            const restart = confirm("Game removed successfully! Steam needs to restart. Restart now?");
+                            const restart = await presentConfirmation({
+                                title: 'Restart Steam',
+                                message: 'Game removed successfully! Steam needs to restart. Restart now?',
+                                confirmLabel: 'Restart now',
+                                cancelLabel: 'Later',
+                            });
                             if (restart) {
                                 await restartt();
                             } else {
@@ -398,7 +557,12 @@ export default function WebkitMain() {
                         const wasInstalled = await showDlcSelection(appId, dlcResult.dlc);
                         // Only ask to restart if something was installed
                         if (wasInstalled) {
-                            const restart = confirm("Do you want to restart Steam now?");
+                            const restart = await presentConfirmation({
+                                title: 'Restart Steam',
+                                message: 'Changes applied. Steam needs to restart. Restart now?',
+                                confirmLabel: 'Restart now',
+                                cancelLabel: 'Later',
+                            });
                             if (restart) {
                                 await restartt();
                             } else {
@@ -421,7 +585,12 @@ export default function WebkitMain() {
                                 const installRaw = await installDlcsRpc({ appid: appId, dlcs: [] });
                                 const installResult = normalizeInstallDlcsResult(installRaw);
                                 if (installResult.success) {
-                                    const restart = confirm("Game added successfully! Steam needs to restart. Restart now?");
+                                    const restart = await presentConfirmation({
+                                        title: 'Restart Steam',
+                                        message: 'Game added successfully! Steam needs to restart. Restart now?',
+                                        confirmLabel: 'Restart now',
+                                        cancelLabel: 'Later',
+                                    });
                                     if (restart) {
                                         await restartt();
                                     } else {
@@ -490,3 +659,4 @@ export default function WebkitMain() {
 
     keepAlive.observe(document.body, { childList: true, subtree: true });
 }
+
