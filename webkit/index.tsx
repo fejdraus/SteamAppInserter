@@ -34,6 +34,13 @@ const createDialogButton = (label: string, variant: 'primary' | 'secondary' = 'p
     button.type = 'button';
     button.className = variant === 'primary' ? 'btnv6_blue_hoverfade btn_medium' : 'btnv6_lightblue_blue btn_medium';
     button.textContent = label;
+    button.style.display = 'inline-flex';
+    button.style.justifyContent = 'center';
+    button.style.alignItems = 'center';
+    button.style.minWidth = '170px';
+    button.style.padding = '0 28px';
+    button.style.minHeight = '32px';
+    button.style.boxSizing = 'border-box';
     return button;
 };
 
@@ -89,7 +96,6 @@ const createDialogShell = (title: string, subtitle?: string) => {
     actions.style.display = 'flex';
     actions.style.justifyContent = 'flex-end';
     actions.style.gap = '12px';
-    actions.style.borderTop = '1px solid rgba(255, 255, 255, 0.08)';
     actions.style.marginTop = '16px';
     actions.style.paddingTop = '16px';
     dialog.appendChild(actions);
