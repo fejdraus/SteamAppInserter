@@ -342,7 +342,7 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         list.style.paddingRight = '8px';
         content.appendChild(list);
 
-        const getInputs = () => Array.from(list.querySelectorAll('input[type="checkbox"]')) as HTMLInputElement[];
+        const dlcCheckboxes: HTMLInputElement[] = [];
 
         const masterRow = document.createElement('label');
         masterRow.style.display = 'flex';
@@ -356,27 +356,27 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
 
         const masterCheckbox = document.createElement('input');
         masterCheckbox.type = 'checkbox';
-        masterCheckbox.title = 'Select/Unselect all DLC';
+        masterCheckbox.title = 'Select all DLC';
         masterCheckbox.style.transform = 'scale(1.1)';
         masterCheckbox.style.cursor = 'pointer';
+        masterCheckbox.dataset.role = 'master';
         masterRow.appendChild(masterCheckbox);
 
         const masterText = document.createElement('div');
-        masterText.textContent = 'Select/Unselect all DLC';
+        masterText.textContent = 'Select all DLC';
         masterText.style.fontWeight = '600';
         masterRow.appendChild(masterText);
 
         const updateMasterState = () => {
-            const inputs = getInputs();
-            if (!inputs.length) {
+            if (!dlcCheckboxes.length) {
                 masterCheckbox.checked = false;
                 masterCheckbox.indeterminate = false;
                 masterCheckbox.disabled = true;
                 return;
             }
             masterCheckbox.disabled = false;
-            const allChecked = inputs.every((input) => input.checked);
-            const someChecked = inputs.some((input) => input.checked);
+            const allChecked = dlcCheckboxes.every((input) => input.checked);
+            const someChecked = dlcCheckboxes.some((input) => input.checked);
             masterCheckbox.checked = allChecked;
             masterCheckbox.indeterminate = !allChecked && someChecked;
         };
@@ -393,6 +393,8 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.value = entry.appid;
+            checkbox.dataset.role = 'dlc';
+            dlcCheckboxes.push(checkbox);
 
             const textContainer = document.createElement('div');
             const mainLine = document.createElement('div');
@@ -451,8 +453,7 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         });
 
         confirmButton.addEventListener('click', async () => {
-            const inputs = getInputs();
-            const selected = inputs.filter((input) => input.checked).map((input) => input.value);
+            const selected = dlcCheckboxes.filter((input) => input.checked).map((input) => input.value);
 
             setDisabled(true);
             try {
@@ -484,9 +485,8 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         dialog.addEventListener('keydown', handleKey);
 
         masterCheckbox.addEventListener('change', () => {
-            const inputs = getInputs();
-            if (!inputs.length) return;
-            inputs.forEach((input) => {
+            if (!dlcCheckboxes.length) return;
+            dlcCheckboxes.forEach((input) => {
                 input.checked = masterCheckbox.checked;
             });
             updateMasterState();

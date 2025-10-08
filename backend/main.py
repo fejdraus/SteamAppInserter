@@ -415,7 +415,15 @@ class Backend:
         requested_raw = data.get('dlcs') or []
         if not isinstance(requested_raw, list):
             requested_raw = [requested_raw]
-        requested = [str(dlc).strip() for dlc in requested_raw if str(dlc).strip()]
+        requested = []
+        for dlc in requested_raw:
+            candidate = str(dlc).strip()
+            if not candidate:
+                continue
+            if not candidate.isdigit():
+                logger.log(f"Skipping non-numeric DLC id: {candidate}")
+                continue
+            requested.append(candidate)
 
         # Check if base game file exists, if not - download it
         base_game_path = os.path.join(getSteamPath(), 'config', 'stplug-in', f'{appid}.lua')
