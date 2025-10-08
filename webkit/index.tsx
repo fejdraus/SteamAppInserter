@@ -217,6 +217,9 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         actions.style.display = 'flex';
         actions.style.justifyContent = 'flex-end';
         actions.style.gap = '12px';
+        actions.style.borderTop = '1px solid rgba(255, 255, 255, 0.08)';
+        actions.style.marginTop = '16px';
+        actions.style.paddingTop = '16px';
 
         const cancelButton = document.createElement('button');
         cancelButton.type = 'button';
@@ -270,11 +273,11 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
                     closeOverlay(true);
                 } else {
                     setDisabled(false);
-                    await presentMessage('Installation failed', response.details || 'Failed to install selected DLC');
+                    await presentMessage('Adding failed', response.details || 'Failed to adding selected DLC');
                 }
             } catch (error) {
                 setDisabled(false);
-                await presentMessage('Installation failed', `Error: ${error instanceof Error ? error.message : error}`);
+                await presentMessage('Adding failed', `Error: ${error instanceof Error ? error.message : error}`);
             }
         });
 
@@ -285,6 +288,10 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
     });
+};
+
+const confirmBaseGameInstall = async (): Promise<boolean> => {
+    return confirm('This game has no DLC. Do you want to add it to your library?');
 };
 
 export default function WebkitMain() {
@@ -403,8 +410,35 @@ export default function WebkitMain() {
                             await insertButtons();
                         }
                     } else if (dlcResult.success) {
-                        // No DLC available, just show message
-                        await presentMessage("No DLC available", "This game has no DLC to install.");
+                        if (!isPirated) {
+                            const shouldInstall = await confirmBaseGameInstall();
+                            if (!shouldInstall) {
+                                addBtn.disabled = false;
+                                addBtn.innerHTML = `<span>Add to library</span>`;
+                                return;
+                            }
+                            addBtn.innerHTML = `<span>Adding...</span>`;
+                            try {
+                                const installRaw = await installDlcsRpc({ appid: appId, dlcs: [] });
+                                const installResult = normalizeInstallDlcsResult(installRaw);
+                                if (installResult.success) {
+                                    const restart = confirm("Game added successfully! Steam needs to restart. Restart now?");
+                                    if (restart) {
+                                        await restartt();
+                                    } else {
+                                        await insertButtons();
+                                    }
+                                    return;
+                                } else {
+                                    await presentMessage("Unable to add game", installResult.details || "Failed to install the base game.");
+                                }
+                            } catch (installErr) {
+                                const errorMessage = installErr instanceof Error ? installErr.message : String(installErr);
+                                await presentMessage("Unable to add game", "Error: " + errorMessage);
+                            }
+                        } else {
+                            await presentMessage("No DLC available", "This game has no DLC to install.");
+                        }
                         addBtn.disabled = false;
                         if (isPirated) {
                             addBtn.innerHTML = `<span>Edit DLC library</span>`;
