@@ -342,7 +342,46 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         list.style.paddingRight = '8px';
         content.appendChild(list);
 
-        normalized.forEach((entry) => {
+        const getInputs = () => Array.from(list.querySelectorAll('input[type="checkbox"]')) as HTMLInputElement[];
+
+        const masterRow = document.createElement('label');
+        masterRow.style.display = 'flex';
+        masterRow.style.alignItems = 'center';
+        masterRow.style.gap = '10px';
+        masterRow.style.padding = '6px 0';
+        masterRow.style.borderBottom = '1px solid rgba(255, 255, 255, 0.08)';
+        masterRow.style.cursor = 'pointer';
+        masterRow.style.margin = '0';
+        list.appendChild(masterRow);
+
+        const masterCheckbox = document.createElement('input');
+        masterCheckbox.type = 'checkbox';
+        masterCheckbox.title = 'Select/Unselect all DLC';
+        masterCheckbox.style.transform = 'scale(1.1)';
+        masterCheckbox.style.cursor = 'pointer';
+        masterRow.appendChild(masterCheckbox);
+
+        const masterText = document.createElement('div');
+        masterText.textContent = 'Select/Unselect all DLC';
+        masterText.style.fontWeight = '600';
+        masterRow.appendChild(masterText);
+
+        const updateMasterState = () => {
+            const inputs = getInputs();
+            if (!inputs.length) {
+                masterCheckbox.checked = false;
+                masterCheckbox.indeterminate = false;
+                masterCheckbox.disabled = true;
+                return;
+            }
+            masterCheckbox.disabled = false;
+            const allChecked = inputs.every((input) => input.checked);
+            const someChecked = inputs.some((input) => input.checked);
+            masterCheckbox.checked = allChecked;
+            masterCheckbox.indeterminate = !allChecked && someChecked;
+        };
+
+        normalized.forEach((entry, index) => {
             const label = document.createElement('label');
             label.dataset.appid = entry.appid;
             label.style.display = 'flex';
@@ -375,6 +414,15 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
             label.appendChild(checkbox);
             label.appendChild(textContainer);
             list.appendChild(label);
+
+            checkbox.addEventListener('change', () => {
+                updateMasterState();
+            });
+
+            // Skip adding a divider after the last item to avoid double borders with the list container.
+            if (index === normalized.length - 1) {
+                label.style.borderBottom = 'none';
+            }
         });
 
         const cancelButton = createDialogButton('Cancel', 'secondary');
@@ -403,7 +451,7 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         });
 
         confirmButton.addEventListener('click', async () => {
-            const inputs = Array.from(list.querySelectorAll('input[type="checkbox"]')) as HTMLInputElement[];
+            const inputs = getInputs();
             const selected = inputs.filter((input) => input.checked).map((input) => input.value);
 
             setDisabled(true);
@@ -434,6 +482,17 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         };
 
         dialog.addEventListener('keydown', handleKey);
+
+        masterCheckbox.addEventListener('change', () => {
+            const inputs = getInputs();
+            if (!inputs.length) return;
+            inputs.forEach((input) => {
+                input.checked = masterCheckbox.checked;
+            });
+            updateMasterState();
+        });
+
+        updateMasterState();
     });
 };
 
@@ -665,4 +724,3 @@ export default function WebkitMain() {
 
     keepAlive.observe(document.body, { childList: true, subtree: true });
 }
-
