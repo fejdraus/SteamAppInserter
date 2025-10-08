@@ -217,7 +217,6 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
         actions.style.display = 'flex';
         actions.style.justifyContent = 'flex-end';
         actions.style.gap = '12px';
-        actions.style.borderTop = '1px solid rgba(255, 255, 255, 0.08)';
         actions.style.marginTop = '16px';
         actions.style.paddingTop = '16px';
 
