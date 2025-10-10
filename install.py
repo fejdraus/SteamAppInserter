@@ -100,19 +100,7 @@ def config_millenium(steam_path):
     config_path = os.path.join(ext_folder, "config.json")
     download_file(config_url, config_path)
 
-
-def dns_change():
-    # Change DNS settings
-    try:
-        dns_command = 'wmic nicconfig where (IPEnabled=TRUE) call SetDNSServerSearchOrder ("94.140.14.14", "94.140.15.15")'
-        subprocess.run(dns_command, shell=True, check=True)
-        print("DNS settings changed successfully")
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to change DNS settings: {e}")
-
-
 def main():
-    dns_change()
     os.system("cls")
     input("Press Enter to continue...")
     print("Steam App Adder Installer (Without SteamTools)")

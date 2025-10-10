@@ -505,6 +505,35 @@ const confirmBaseGameInstall = async (): Promise<boolean> => {
     });
 };
 
+/**
+ * Throttle function to limit how often a function can be called.
+ * @param func Function to throttle
+ * @param delay Minimum time between function calls in milliseconds
+ */
+const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): ((...args: Parameters<T>) => void) => {
+    let lastCall = 0;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    return (...args: Parameters<T>) => {
+        const now = Date.now();
+        const timeSinceLastCall = now - lastCall;
+
+        if (timeSinceLastCall >= delay) {
+            lastCall = now;
+            func(...args);
+        } else {
+            // Schedule a delayed call if not already scheduled
+            if (!timeoutId) {
+                timeoutId = setTimeout(() => {
+                    lastCall = Date.now();
+                    timeoutId = null;
+                    func(...args);
+                }, delay - timeSinceLastCall);
+            }
+        }
+    };
+};
+
 export default function WebkitMain() {
     if (!/^https:\/\/store\.steampowered\.com\/app\//.test(location.href)) return;
 
@@ -715,12 +744,15 @@ export default function WebkitMain() {
         insertButtons();
     }
 
-    const keepAlive = new MutationObserver(() => {
+    // Throttle MutationObserver callback to prevent excessive calls (max once every 500ms)
+    const throttledInsertCheck = throttle(() => {
         const appId = getAppId();
         if (appId && !document.getElementById(ADD_BTN_ID) && !document.getElementById(REMOVE_BTN_ID)) {
             insertButtons();
         }
-    });
+    }, 500);
+
+    const keepAlive = new MutationObserver(throttledInsertCheck);
 
     keepAlive.observe(document.body, { childList: true, subtree: true });
 }
