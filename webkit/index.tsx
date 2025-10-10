@@ -542,6 +542,105 @@ const WAIT_FOR_ELEMENT_TIMEOUT = 20000;
 const MUTATION_OBSERVER_THROTTLE_MS = 500;
 const RETRY_INSERT_DELAY_MS = 1000;
 
+// UI Text Constants
+const UI_TEXT = {
+    BUTTONS: {
+        ADD_TO_LIBRARY: 'Add to library',
+        EDIT_DLC_LIBRARY: 'Edit DLC library',
+        REMOVE_FROM_LIBRARY: 'Remove from library',
+        LOADING: 'Loading...',
+        ADDING: 'Adding...',
+        REMOVING: 'Removing...',
+    },
+} as const;
+
+/**
+ * Reset add button to initial state with appropriate label
+ */
+const resetAddButton = (button: HTMLButtonElement, isPirated: boolean): void => {
+    button.disabled = false;
+    button.innerHTML = isPirated
+        ? `<span>${UI_TEXT.BUTTONS.EDIT_DLC_LIBRARY}</span>`
+        : `<span>${UI_TEXT.BUTTONS.ADD_TO_LIBRARY}</span>`;
+};
+
+/**
+ * Prompt user to restart Steam after successful operation
+ * @param message Success message to show
+ * @param onRefreshButtons Callback to refresh buttons after canceling restart
+ * @returns Promise that resolves when dialog is closed
+ */
+const promptSteamRestart = async (message: string, onRefreshButtons: () => Promise<void>): Promise<void> => {
+    const restart = await presentConfirmation({
+        title: 'Restart Steam',
+        message: `${message} Steam needs to restart. Restart now?`,
+        confirmLabel: 'Restart now',
+        cancelLabel: 'Later',
+    });
+
+    if (restart) {
+        await restartt();
+    } else {
+        await onRefreshButtons();
+    }
+};
+
+/**
+ * Handle DLC installation workflow (fetch list + show selection dialog)
+ * @param appId Application ID
+ * @param dlcList List of available DLC
+ * @param onRefreshButtons Callback to refresh buttons after operation
+ */
+const handleDlcInstallation = async (appId: string, dlcList: DlcEntry[], onRefreshButtons: () => Promise<void>): Promise<void> => {
+    const wasInstalled = await showDlcSelection(appId, dlcList);
+    if (wasInstalled) {
+        await promptSteamRestart('Changes applied.', onRefreshButtons);
+    } else {
+        // Cancel was clicked, just refresh buttons
+        await onRefreshButtons();
+    }
+};
+
+/**
+ * Handle base game installation (game with no DLC)
+ * @param appId Application ID
+ * @param addBtn Add button element
+ * @param isPirated Whether game is already installed
+ * @param onRefreshButtons Callback to refresh buttons after operation
+ */
+const handleBaseGameInstallation = async (appId: string, addBtn: HTMLButtonElement, isPirated: boolean, onRefreshButtons: () => Promise<void>): Promise<void> => {
+    const shouldInstall = await confirmBaseGameInstall();
+    if (!shouldInstall) {
+        resetAddButton(addBtn, isPirated);
+        return;
+    }
+
+    addBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.ADDING}</span>`;
+    try {
+        const installRaw = await installDlcsRpc({ appid: appId, dlcs: [] });
+        const installResult = normalizeInstallDlcsResult(installRaw);
+        if (installResult.success) {
+            await promptSteamRestart('Game added successfully!', onRefreshButtons);
+        } else {
+            await presentMessage("Unable to add game", installResult.details || "Failed to install the base game.");
+            resetAddButton(addBtn, isPirated);
+        }
+    } catch (installErr) {
+        const errorMessage = installErr instanceof Error ? installErr.message : String(installErr);
+        await presentMessage("Unable to add game", "Error: " + errorMessage);
+        resetAddButton(addBtn, isPirated);
+    }
+};
+
+/**
+ * Handle errors during add button operation
+ */
+const handleAddError = async (error: unknown, addBtn: HTMLButtonElement, isPirated: boolean): Promise<void> => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await presentMessage("Unable to get DLC list", "Error: " + errorMessage);
+    resetAddButton(addBtn, isPirated);
+};
+
 export default function WebkitMain() {
     if (!/^https:\/\/store\.steampowered\.com\/app\//.test(location.href)) return;
 
@@ -583,7 +682,7 @@ export default function WebkitMain() {
                 removeBtn.type = "button";
                 removeBtn.style.marginRight = "3px";
                 removeBtn.className = "btnv6_blue_hoverfade btn_medium";
-                removeBtn.innerHTML = `<span>Remove from library</span>`;
+                removeBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.REMOVE_FROM_LIBRARY}</span>`;
 
                 removeBtn.addEventListener("click", async (e) => {
                     e.preventDefault();
@@ -600,31 +699,21 @@ export default function WebkitMain() {
                     }
 
                     removeBtn.disabled = true;
-                    removeBtn.innerHTML = `<span>Removing...</span>`;
+                    removeBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.REMOVING}</span>`;
 
                     try {
                         const success = await deletegame({ id: appId });
                         if (success) {
-                            const restart = await presentConfirmation({
-                                title: 'Restart Steam',
-                                message: 'Game removed successfully! Steam needs to restart. Restart now?',
-                                confirmLabel: 'Restart now',
-                                cancelLabel: 'Later',
-                            });
-                            if (restart) {
-                                await restartt();
-                            } else {
-                                await insertButtons();
-                            }
+                            await promptSteamRestart('Game removed successfully!', insertButtons);
                         } else {
                             await presentMessage("Unable to remove", "Failed to remove the game!");
                             removeBtn.disabled = false;
-                            removeBtn.innerHTML = `<span>Remove from library</span>`;
+                            removeBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.REMOVE_FROM_LIBRARY}</span>`;
                         }
                     } catch (err) {
                         await presentMessage("Unable to remove", "Error: " + (err?.message ?? err));
                         removeBtn.disabled = false;
-                        removeBtn.innerHTML = `<span>Remove from library</span>`;
+                        removeBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.REMOVE_FROM_LIBRARY}</span>`;
                     }
                 });
 
@@ -634,101 +723,41 @@ export default function WebkitMain() {
                 } else {
                     container.appendChild(removeBtn);
                 }
-                addBtn.innerHTML = `<span>Edit DLC library</span>`;
+                addBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.EDIT_DLC_LIBRARY}</span>`;
             } else {
-                addBtn.innerHTML = `<span>Add to library</span>`;
+                addBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.ADD_TO_LIBRARY}</span>`;
             }
             addBtn.addEventListener("click", async (e) => {
                 e.preventDefault();
                 addBtn.disabled = true;
-                if (isPirated) {
-                    addBtn.innerHTML = `<span>Loading...</span>`;
-                } else {
-                    addBtn.innerHTML = `<span>Loading...</span>`;
-                }
+                addBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.LOADING}</span>`;
+
                 try {
                     // Get DLC list without downloading
                     const rawResult = await getDlcListRpc({ appid: appId });
                     const dlcResult = normalizeInstallResult(rawResult);
 
-                    if (dlcResult.success && dlcResult.dlc && dlcResult.dlc.length) {
-                        // Show DLC selection dialog
-                        const wasInstalled = await showDlcSelection(appId, dlcResult.dlc);
-                        // Only ask to restart if something was installed
-                        if (wasInstalled) {
-                            const restart = await presentConfirmation({
-                                title: 'Restart Steam',
-                                message: 'Changes applied. Steam needs to restart. Restart now?',
-                                confirmLabel: 'Restart now',
-                                cancelLabel: 'Later',
-                            });
-                            if (restart) {
-                                await restartt();
-                            } else {
-                                await insertButtons();
-                            }
-                        } else {
-                            // Cancel was clicked, just refresh buttons
-                            await insertButtons();
-                        }
-                    } else if (dlcResult.success) {
-                        if (!isPirated) {
-                            const shouldInstall = await confirmBaseGameInstall();
-                            if (!shouldInstall) {
-                                addBtn.disabled = false;
-                                addBtn.innerHTML = `<span>Add to library</span>`;
-                                return;
-                            }
-                            addBtn.innerHTML = `<span>Adding...</span>`;
-                            try {
-                                const installRaw = await installDlcsRpc({ appid: appId, dlcs: [] });
-                                const installResult = normalizeInstallDlcsResult(installRaw);
-                                if (installResult.success) {
-                                    const restart = await presentConfirmation({
-                                        title: 'Restart Steam',
-                                        message: 'Game added successfully! Steam needs to restart. Restart now?',
-                                        confirmLabel: 'Restart now',
-                                        cancelLabel: 'Later',
-                                    });
-                                    if (restart) {
-                                        await restartt();
-                                    } else {
-                                        await insertButtons();
-                                    }
-                                    return;
-                                } else {
-                                    await presentMessage("Unable to add game", installResult.details || "Failed to install the base game.");
-                                }
-                            } catch (installErr) {
-                                const errorMessage = installErr instanceof Error ? installErr.message : String(installErr);
-                                await presentMessage("Unable to add game", "Error: " + errorMessage);
-                            }
-                        } else {
-                            await presentMessage("No DLC available", "This game has no DLC to install.");
-                        }
-                        addBtn.disabled = false;
-                        if (isPirated) {
-                            addBtn.innerHTML = `<span>Edit DLC library</span>`;
-                        } else {
-                            addBtn.innerHTML = `<span>Add to library</span>`;
-                        }
-                    } else {
+                    if (!dlcResult.success) {
+                        // Failed to fetch DLC list
                         await presentMessage("Unable to get DLC list", dlcResult.details ?? "Failed to fetch game information.");
-                        addBtn.disabled = false;
-                        if (isPirated) {
-                            addBtn.innerHTML = `<span>Edit DLC library</span>`;
-                        } else {
-                            addBtn.innerHTML = `<span>Add to library</span>`;
-                        }
+                        resetAddButton(addBtn, isPirated);
+                        return;
+                    }
+
+                    // Success - check if game has DLC
+                    if (dlcResult.dlc && dlcResult.dlc.length) {
+                        // Game has DLC - show selection dialog
+                        await handleDlcInstallation(appId, dlcResult.dlc, insertButtons);
+                    } else if (!isPirated) {
+                        // No DLC and game not installed - offer base game installation
+                        await handleBaseGameInstallation(appId, addBtn, isPirated, insertButtons);
+                    } else {
+                        // No DLC and game already installed - show message
+                        await presentMessage("No DLC available", "This game has no DLC to install.");
+                        resetAddButton(addBtn, isPirated);
                     }
                 } catch (err) {
-                    await presentMessage("Unable to get DLC list", "Error: " + (err?.message ?? err));
-                    addBtn.disabled = false;
-                    if (isPirated) {
-                        addBtn.innerHTML = `<span>Edit DLC library</span>`;
-                    } else {
-                        addBtn.innerHTML = `<span>Add to library</span>`;
-                    }
+                    await handleAddError(err, addBtn, isPirated);
                 }
             });
 

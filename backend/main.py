@@ -163,11 +163,17 @@ def _ensure_directory(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
-def write_lua_file(appid: str, content: str) -> str:
+def get_manifest_path(appid: str) -> str:
+    """Get path to manifest file for given appid."""
     steam_path = getSteamPath()
     plugin_dir = os.path.join(steam_path, 'config', 'stplug-in')
+    return os.path.join(plugin_dir, f'{appid}.lua')
+
+
+def write_lua_file(appid: str, content: str) -> str:
+    target_path = get_manifest_path(appid)
+    plugin_dir = os.path.dirname(target_path)
     _ensure_directory(plugin_dir)
-    target_path = os.path.join(plugin_dir, f'{appid}.lua')
     with open(target_path, 'w', encoding='utf-8') as handle:
         normalized = content.rstrip('\r\n')
         if normalized:
@@ -175,6 +181,39 @@ def write_lua_file(appid: str, content: str) -> str:
         else:
             handle.write('')
     return target_path
+
+
+def remove_dlc_entries_from_content(content: str, all_available_dlc: set[str]) -> str:
+    """
+    Remove existing DLC entries from lua content.
+    Removes both comment lines (-- DLC: Name) and their corresponding addappid() calls.
+    Also removes addappid() calls for any DLC in all_available_dlc set.
+    """
+    lines = content.split('\n')
+    filtered_lines = []
+    skip_next = False
+
+    for line in lines:
+        # Skip comment lines that start with "-- DLC:"
+        if line.strip().startswith('-- DLC:'):
+            skip_next = True
+            continue
+        # Skip addappid lines for DLC (not main game)
+        if skip_next and 'addappid' in line:
+            skip_next = False
+            continue
+
+        # Remove addappid lines for ALL available DLC (they will be re-added if selected by user)
+        if 'addappid' in line:
+            match = re.search(r'addappid\((\d+)', line)
+            if match and match.group(1) in all_available_dlc:
+                # This addappid is for an available DLC, remove it
+                continue
+
+        skip_next = False
+        filtered_lines.append(line)
+
+    return '\n'.join(filtered_lines).rstrip('\r\n')
 
 
 def fetch_dlc_decryption_keys(dlc_ids: list[str], main_appid: str, main_game_json: Optional[dict[str, Any]] = None) -> dict[str, str]:
@@ -248,7 +287,7 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
     is_application = app_type == 'application'
 
     # Read main game file to check which DLC are already installed
-    main_file = os.path.join(plugin_dir, f'{appid}.lua')
+    main_file = get_manifest_path(appid)
     installed_dlc_ids = set()
     if os.path.isfile(main_file):
         try:
@@ -408,7 +447,7 @@ def install_manifest_for_app(appid: str) -> dict[str, Any]:
     result: dict[str, Any] = {'success': False, 'details': '', 'dlc': [], 'appid': appid}
 
     # Check if file already exists
-    existing_file = os.path.join(getSteamPath(), 'config', 'stplug-in', f'{appid}.lua')
+    existing_file = get_manifest_path(appid)
     file_exists = os.path.isfile(existing_file)
 
     if file_exists:
@@ -459,14 +498,12 @@ class Backend:
 
     @staticmethod
     def checkpirated(id: str):
-        stplugin = os.path.join(getSteamPath(), 'config', 'stplug-in')
-        lua = os.path.join(stplugin, f'{id}.lua')
-        return os.path.exists(lua)
+        manifest_path = get_manifest_path(id)
+        return os.path.exists(manifest_path)
 
     @staticmethod
     def deletelua(id: str):
-        stplugin = os.path.join(getSteamPath(), 'config', 'stplug-in')
-        manifest_path = os.path.join(stplugin, f'{id}.lua')
+        manifest_path = get_manifest_path(id)
         if os.path.isfile(manifest_path):
             try:
                 os.remove(manifest_path)
@@ -566,7 +603,7 @@ class Backend:
             requested.append(candidate)
 
         # Check if base game file exists, if not - download it
-        base_game_path = os.path.join(getSteamPath(), 'config', 'stplug-in', f'{appid}.lua')
+        base_game_path = get_manifest_path(appid)
         if not os.path.isfile(base_game_path):
             logger.log(f'Base game manifest not found, downloading for {appid}')
             # Download and process base game manifest
@@ -605,32 +642,7 @@ class Backend:
         dlc_keys_map = fetch_dlc_decryption_keys(requested, appid)
 
         # Remove existing DLC entries from base content
-        import re
-        lines = base_content.split('\n')
-        filtered_lines = []
-        skip_next = False
-
-        for line in lines:
-            # Skip comment lines that start with "-- DLC:"
-            if line.strip().startswith('-- DLC:'):
-                skip_next = True
-                continue
-            # Skip addappid lines for DLC (not main game)
-            if skip_next and 'addappid' in line:
-                skip_next = False
-                continue
-
-            # Remove addappid lines for ALL available DLC (they will be re-added if selected by user)
-            if 'addappid' in line:
-                match = re.search(r'addappid\((\d+)', line)
-                if match and match.group(1) in all_available_dlc:
-                    # This addappid is for an available DLC, remove it
-                    continue
-
-            skip_next = False
-            filtered_lines.append(line)
-
-        base_content = '\n'.join(filtered_lines).rstrip('\r\n')
+        base_content = remove_dlc_entries_from_content(base_content, all_available_dlc)
 
         # Build DLC lines
         dlc_lines: list[str] = []
