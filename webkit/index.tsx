@@ -534,13 +534,18 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): (
     };
 };
 
+// Constants
+const ADD_BTN_ID = "add-app-to-library-btn";
+const REMOVE_BTN_ID = "remove-app-from-library-btn";
+const CONTAINER_SELECTOR = ".apphub_OtherSiteInfo";
+const WAIT_FOR_ELEMENT_TIMEOUT = 20000;
+const MUTATION_OBSERVER_THROTTLE_MS = 500;
+const RETRY_INSERT_DELAY_MS = 1000;
+
 export default function WebkitMain() {
     if (!/^https:\/\/store\.steampowered\.com\/app\//.test(location.href)) return;
 
-    const ADD_BTN_ID = "add-app-to-library-btn";
-    const REMOVE_BTN_ID = "remove-app-from-library-btn";
-
-    const waitForEl = (selector: string, timeout = 20000) => new Promise((resolve, reject) => {
+    const waitForEl = (selector: string, timeout = WAIT_FOR_ELEMENT_TIMEOUT) => new Promise((resolve, reject) => {
         const found = document.querySelector(selector);
         if (found) return resolve(found);
         const obs = new MutationObserver(() => {
@@ -558,7 +563,7 @@ export default function WebkitMain() {
 
     const insertButtons = async () => {
         try {
-            const container = await waitForEl(".apphub_OtherSiteInfo") as HTMLElement;
+            const container = await waitForEl(CONTAINER_SELECTOR) as HTMLElement;
             const appId = getAppId();
             if (!appId) return;
 
@@ -734,7 +739,7 @@ export default function WebkitMain() {
                 container.appendChild(addBtn);
             }
         } catch {
-            setTimeout(insertButtons, 1000);
+            setTimeout(insertButtons, RETRY_INSERT_DELAY_MS);
         }
     };
 
@@ -744,13 +749,13 @@ export default function WebkitMain() {
         insertButtons();
     }
 
-    // Throttle MutationObserver callback to prevent excessive calls (max once every 500ms)
+    // Throttle MutationObserver callback to prevent excessive calls
     const throttledInsertCheck = throttle(() => {
         const appId = getAppId();
         if (appId && !document.getElementById(ADD_BTN_ID) && !document.getElementById(REMOVE_BTN_ID)) {
             insertButtons();
         }
-    }, 500);
+    }, MUTATION_OBSERVER_THROTTLE_MS);
 
     const keepAlive = new MutationObserver(throttledInsertCheck);
 

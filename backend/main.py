@@ -177,6 +177,64 @@ def write_lua_file(appid: str, content: str) -> str:
     return target_path
 
 
+def fetch_dlc_decryption_keys(dlc_ids: list[str], main_appid: str, main_game_json: Optional[dict[str, Any]] = None) -> dict[str, str]:
+    """
+    Fetch decryption keys for DLC from main game manifest and individual DLC manifests.
+    Returns a dict mapping DLC appid to decryption key.
+    """
+    dlc_keys_map: dict[str, str] = {}
+
+    # First, check main game manifest for DLC keys
+    if main_game_json is None:
+        main_game_json = download_json_manifest(main_appid)
+
+    if main_game_json:
+        depot_data = main_game_json.get('depot', {})
+        for dlc_id in dlc_ids:
+            dlc_depot = depot_data.get(dlc_id)
+            if not dlc_depot and dlc_id.isdigit():
+                dlc_depot = depot_data.get(int(dlc_id))
+            if isinstance(dlc_depot, dict):
+                key = str(dlc_depot.get('decryptionkey') or '').strip()
+                if key:
+                    dlc_keys_map[dlc_id] = key
+                    logger.log(f"Found key for DLC {dlc_id} in main game manifest")
+
+    # For DLC without keys in main manifest, check individual DLC manifests in parallel
+    dlcs_to_fetch = [dlc_id for dlc_id in dlc_ids if dlc_id not in dlc_keys_map]
+
+    if dlcs_to_fetch:
+        logger.log(f"Fetching manifests for {len(dlcs_to_fetch)} DLC in parallel")
+
+        def fetch_dlc_key(dlc_id: str) -> tuple[str, Optional[str]]:
+            dlc_json = download_json_manifest(dlc_id)
+            if dlc_json:
+                dlc_depot_data = dlc_json.get('depot', {})
+                dlc_depot = dlc_depot_data.get(dlc_id)
+                if not dlc_depot and dlc_id.isdigit():
+                    dlc_depot = dlc_depot_data.get(int(dlc_id))
+                if isinstance(dlc_depot, dict):
+                    key = str(dlc_depot.get('decryptionkey') or '').strip()
+                    if key:
+                        return (dlc_id, key)
+            return (dlc_id, None)
+
+        # Use ThreadPoolExecutor for parallel downloads (max 5 concurrent requests)
+        with ThreadPoolExecutor(max_workers=min(5, len(dlcs_to_fetch))) as executor:
+            futures = [executor.submit(fetch_dlc_key, dlc_id) for dlc_id in dlcs_to_fetch]
+
+            for future in as_completed(futures):
+                try:
+                    dlc_id, key = future.result()
+                    if key:
+                        dlc_keys_map[dlc_id] = key
+                        logger.log(f"Found key for DLC {dlc_id} in DLC manifest")
+                except Exception as exc:
+                    logger.log(f"Error fetching manifest for DLC: {exc}")
+
+    return dlc_keys_map
+
+
 def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
     info = fetch_game_info(appid)
     if not info:
@@ -219,10 +277,8 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
         if main_game_json:
             logger.log(f"Loaded main game JSON manifest for {appid}")
 
-    # First pass: collect DLC info and check keys in main manifest
+    # First pass: collect DLC info
     dlc_items: list[tuple[str, str]] = []  # (dlc_appid, name)
-    dlc_keys_from_main: dict[str, str] = {}
-
     for item in related:
         if not isinstance(item, dict):
             continue
@@ -235,57 +291,17 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
         name = item.get('name') or f'DLC {dlc_appid}'
         dlc_items.append((dlc_appid, name))
 
-        # For Application type, check main game manifest for keys
-        if is_application and main_game_json:
-            depot_data = main_game_json.get('depot', {})
-            dlc_depot = depot_data.get(dlc_appid)
-            if not dlc_depot and dlc_appid.isdigit():
-                dlc_depot = depot_data.get(int(dlc_appid))
-            if isinstance(dlc_depot, dict):
-                key = str(dlc_depot.get('decryptionkey') or '').strip()
-                if key:
-                    dlc_keys_from_main[dlc_appid] = key
-                    logger.log(f"Found key for DLC {dlc_appid} in main game manifest")
-
-    # For Application type: fetch missing keys in parallel
-    dlc_keys_from_individual: dict[str, str] = {}
+    # For Application type: fetch all decryption keys in parallel
+    dlc_keys_map: dict[str, str] = {}
     if is_application:
-        dlcs_to_fetch = [dlc_id for dlc_id, _ in dlc_items if dlc_id not in dlc_keys_from_main]
-
-        if dlcs_to_fetch:
-            logger.log(f"Fetching manifests for {len(dlcs_to_fetch)} DLC in parallel")
-
-            def fetch_dlc_key(dlc_id: str) -> tuple[str, Optional[str]]:
-                dlc_json = download_json_manifest(dlc_id)
-                if dlc_json:
-                    dlc_depot_data = dlc_json.get('depot', {})
-                    dlc_depot = dlc_depot_data.get(dlc_id)
-                    if not dlc_depot and dlc_id.isdigit():
-                        dlc_depot = dlc_depot_data.get(int(dlc_id))
-                    if isinstance(dlc_depot, dict):
-                        key = str(dlc_depot.get('decryptionkey') or '').strip()
-                        if key:
-                            return (dlc_id, key)
-                return (dlc_id, None)
-
-            # Use ThreadPoolExecutor for parallel downloads (max 5 concurrent requests)
-            with ThreadPoolExecutor(max_workers=min(5, len(dlcs_to_fetch))) as executor:
-                futures = [executor.submit(fetch_dlc_key, dlc_id) for dlc_id in dlcs_to_fetch]
-
-                for future in as_completed(futures):
-                    try:
-                        dlc_id, key = future.result()
-                        if key:
-                            dlc_keys_from_individual[dlc_id] = key
-                            logger.log(f"Found key for DLC {dlc_id} in DLC manifest")
-                    except Exception as exc:
-                        logger.log(f"Error fetching manifest for DLC: {exc}")
+        dlc_ids = [dlc_id for dlc_id, _ in dlc_items]
+        dlc_keys_map = fetch_dlc_decryption_keys(dlc_ids, appid, main_game_json)
 
     # Second pass: build candidates list
     candidates: list[dict[str, Any]] = []
     for dlc_appid, name in dlc_items:
         # Get decryption key (if applicable)
-        decryption_key = dlc_keys_from_main.get(dlc_appid) or dlc_keys_from_individual.get(dlc_appid)
+        decryption_key = dlc_keys_map.get(dlc_appid)
 
         # For Application type, skip DLC without decryption keys
         if is_application and not decryption_key:
@@ -586,50 +602,7 @@ class Backend:
 
         # Get decryption keys for requested DLC (for all game types)
         is_application = app_type == 'application'
-        dlc_keys_map: dict[str, str] = {}
-
-        # First, check main game manifest for DLC keys
-        main_game_json = download_json_manifest(appid)
-        if main_game_json:
-            depot_data = main_game_json.get('depot', {})
-            for dlc_appid in requested:
-                dlc_depot = depot_data.get(dlc_appid)
-                if not dlc_depot and dlc_appid.isdigit():
-                    dlc_depot = depot_data.get(int(dlc_appid))
-                if isinstance(dlc_depot, dict):
-                    key = str(dlc_depot.get('decryptionkey') or '').strip()
-                    if key:
-                        dlc_keys_map[dlc_appid] = key
-                        logger.log(f"Found key for DLC {dlc_appid} in main game manifest")
-
-        # For DLC without keys in main manifest, check individual DLC manifests in parallel
-        dlcs_to_fetch = [dlc_id for dlc_id in requested if dlc_id not in dlc_keys_map]
-
-        if dlcs_to_fetch:
-            logger.log(f"Fetching manifests for {len(dlcs_to_fetch)} DLC in parallel")
-
-            def fetch_dlc_manifest(dlc_id: str) -> tuple[str, Optional[dict[str, Any]]]:
-                return (dlc_id, download_json_manifest(dlc_id))
-
-            # Use ThreadPoolExecutor for parallel downloads (max 5 concurrent requests)
-            with ThreadPoolExecutor(max_workers=min(5, len(dlcs_to_fetch))) as executor:
-                future_to_dlc = {executor.submit(fetch_dlc_manifest, dlc_id): dlc_id for dlc_id in dlcs_to_fetch}
-
-                for future in as_completed(future_to_dlc):
-                    try:
-                        dlc_appid, dlc_json = future.result()
-                        if dlc_json:
-                            dlc_depot_data = dlc_json.get('depot', {})
-                            dlc_depot = dlc_depot_data.get(dlc_appid)
-                            if not dlc_depot and dlc_appid.isdigit():
-                                dlc_depot = dlc_depot_data.get(int(dlc_appid))
-                            if isinstance(dlc_depot, dict):
-                                key = str(dlc_depot.get('decryptionkey') or '').strip()
-                                if key:
-                                    dlc_keys_map[dlc_appid] = key
-                                    logger.log(f"Found key for DLC {dlc_appid} in DLC manifest")
-                    except Exception as exc:
-                        logger.log(f"Error fetching manifest for DLC {future_to_dlc[future]}: {exc}")
+        dlc_keys_map = fetch_dlc_decryption_keys(requested, appid)
 
         # Remove existing DLC entries from base content
         import re
