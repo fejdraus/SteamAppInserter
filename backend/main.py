@@ -143,6 +143,10 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
     steam_path = getSteamPath()
     plugin_dir = os.path.join(steam_path, 'config', 'stplug-in')
 
+    # Check if main app is type "Application" - requires DLC to have decryption keys
+    app_type = (info.get('type') or '').lower()
+    is_application = app_type == 'application'
+
     # Read main game file to check which DLC are already installed
     main_file = os.path.join(plugin_dir, f'{appid}.lua')
     installed_dlc_ids = set()
@@ -177,14 +181,39 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
         if not dlc_appid:
             continue
         name = item.get('name') or f'DLC {dlc_appid}'
+
+        # For Application type, get decryption key from DLC's own manifest
+        decryption_key = None
+        if is_application:
+            dlc_json = download_json_manifest(dlc_appid)
+            if dlc_json:
+                dlc_depot_data = dlc_json.get('depot', {})
+                dlc_depot = dlc_depot_data.get(dlc_appid)
+                if not dlc_depot and dlc_appid.isdigit():
+                    dlc_depot = dlc_depot_data.get(int(dlc_appid))
+                if isinstance(dlc_depot, dict):
+                    decryption_key = str(dlc_depot.get('decryptionkey') or '').strip()
+                    if decryption_key:
+                        logger.log(f"Found key for DLC {dlc_appid} in DLC manifest")
+
+            # For Application type, skip DLC without decryption keys
+            if not decryption_key:
+                logger.log(f"Skipping DLC {dlc_appid} ({name}) - no manifest or decryption key")
+                continue
+
         # Check if this DLC appid is in the main game file
         already_installed = dlc_appid in installed_dlc_ids
-        logger.log(f"DLC {dlc_appid} ({name}): alreadyInstalled={already_installed}")
-        candidates.append({
+        logger.log(f"DLC {dlc_appid} ({name}): alreadyInstalled={already_installed}, key={'present' if decryption_key else 'none'}")
+
+        candidate_data = {
             'appid': dlc_appid,
             'name': name,
             'alreadyInstalled': already_installed,
-        })
+        }
+        if decryption_key:
+            candidate_data['decryptionKey'] = decryption_key
+
+        candidates.append(candidate_data)
     return candidates
 
 
@@ -288,15 +317,9 @@ def install_manifest_for_app(appid: str) -> dict[str, Any]:
         info = fetch_game_info(appid)
         if info:
             name = info.get('name') or 'Unknown'
-            result['details'] = (
-                f"Manifest for {appid} ({name}) is not available on the public mirrors. "
-                'It may require manual review or private access.'
-            )
+            result['details'] = f"Manifest for {appid} ({name}) is not available on the public mirrors."
         else:
-            result['details'] = (
-                f"Manifest for {appid} is not available on the public mirrors. "
-                'Check your network or request manual access.'
-            )
+            result['details'] = f"Manifest for {appid} is not available on the public mirrors."
         return result
 
     # Download .json file
@@ -379,6 +402,15 @@ class Backend:
             logger.log(details)
             return {'success': False, 'details': details, 'dlc': [], 'appid': ''}
 
+        # Verify main game manifest exists before showing DLC
+        main_game_manifest = download_lua_manifest(appid)
+        if not main_game_manifest:
+            game_info = fetch_game_info(appid)
+            name = game_info.get('name') if game_info else 'Unknown'
+            details = f"Manifest for {appid} ({name}) is not available on the public mirrors."
+            logger.log(details)
+            return {'success': False, 'details': details, 'dlc': [], 'appid': appid}
+
         result: dict[str, Any] = {'success': True, 'details': '', 'dlc': [], 'appid': appid}
         result['dlc'] = collect_dlc_candidates(appid)
         return result
@@ -445,16 +477,36 @@ class Backend:
         with open(base_game_path, 'r', encoding='utf-8') as handle:
             base_content = handle.read()
 
-        # Get game info to fetch DLC names
+        # Get game info to fetch DLC names and check app type
         game_info = fetch_game_info(appid)
         dlc_info_map: dict[str, dict[str, Any]] = {}
+        app_type = ''
         if game_info:
+            app_type = (game_info.get('type') or '').lower()
             related = game_info.get('related_content') or []
             for item in related:
                 if isinstance(item, dict) and item.get('type', '').lower() == 'dlc':
                     dlc_appid = str(item.get('appid', ''))
                     if dlc_appid:
                         dlc_info_map[dlc_appid] = item
+
+        # For Application type, get decryption keys from DLC manifests
+        is_application = app_type == 'application'
+        dlc_keys_map: dict[str, str] = {}
+        if is_application:
+            # For Application type, DLC keys are only in individual DLC manifests
+            for dlc_appid in requested:
+                dlc_json = download_json_manifest(dlc_appid)
+                if dlc_json:
+                    dlc_depot_data = dlc_json.get('depot', {})
+                    dlc_depot = dlc_depot_data.get(dlc_appid)
+                    if not dlc_depot and dlc_appid.isdigit():
+                        dlc_depot = dlc_depot_data.get(int(dlc_appid))
+                    if isinstance(dlc_depot, dict):
+                        key = str(dlc_depot.get('decryptionkey') or '').strip()
+                        if key:
+                            dlc_keys_map[dlc_appid] = key
+                            logger.log(f"Found key for DLC {dlc_appid} in DLC manifest")
 
         # Remove existing DLC entries from base content
         import re
@@ -485,7 +537,14 @@ class Backend:
             dlc_name = dlc_info.get('name') or f'DLC {dlc_appid}'
 
             dlc_lines.append(f'-- DLC: {dlc_name}')
-            dlc_lines.append(f'addappid({dlc_appid})')
+
+            # For Application type, use decryption key if available
+            if is_application and dlc_appid in dlc_keys_map:
+                dlc_key = dlc_keys_map[dlc_appid]
+                dlc_lines.append(f'addappid({dlc_appid},0,"{dlc_key}")')
+            else:
+                dlc_lines.append(f'addappid({dlc_appid})')
+
             installed_ids.append(dlc_appid)
 
         # Merge: base content + DLC lines
