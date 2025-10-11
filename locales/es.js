@@ -68,6 +68,27 @@ const es = {
     success: "Listo.",
     failure: "La operacion fallo.",
   },
+  mirrors: {
+    title: "Elige la fuente de descarga",
+    default: "Espejos publicos (ManifestHub)",
+    maniluaUnderConstruction: "API de Manilua (en desarrollo)",
+    maniluaDisabled: "",
+    manilua: "API de Manilua (requiere clave)",
+  },
+  auth: {
+    title: "Clave de la API Manilua",
+    instructions: "Introduce tu clave de la API Manilua. Puedes obtenerla en el panel de Manilua.",
+    placeholder: "manilua_xxxxxxxxxxxxxxxxx",
+    example: "Ejemplo: manilua_abc123...",
+    save: "Guardar",
+    saving: "Guardando...",
+    required: "La clave es obligatoria.",
+    invalid: "La clave no es valida. Intentalo de nuevo.",
+    validationFailed: "La validacion de la clave fallo. Comprueba la clave e intentalo de nuevo.",
+    error: "Error de validacion",
+  },
 };
 
 export default es;
+
+

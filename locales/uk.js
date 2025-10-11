@@ -70,6 +70,26 @@ const uk = {
     success: "Готово!",
     failure: "Операція не вдалася.",
   },
+  mirrors: {
+    title: "Оберіть джерело завантаження",
+    default: "Публічні дзеркала (ManifestHub)",
+    maniluaUnderConstruction: "API Manilua (у розробці)",
+    maniluaDisabled: "",
+    manilua: "API Manilua (потрібен ключ)",
+  },
+  auth: {
+    title: "API-ключ Manilua",
+    instructions: "Введіть свій API-ключ Manilua. Його можна отримати в кабінеті Manilua.",
+    placeholder: "manilua_xxxxxxxxxxxxxxxxx",
+    example: "Приклад: manilua_abc123...",
+    save: "Зберегти",
+    saving: "Збереження...",
+    required: "Необхідно вказати ключ.",
+    invalid: "Ключ недійсний. Спробуйте ще раз.",
+    validationFailed: "Перевірка API-ключа не вдалася. Перевірте ключ і спробуйте знову.",
+    error: "Помилка перевірки",
+  },
 };
 
 export default uk;
+

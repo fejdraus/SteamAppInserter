@@ -68,6 +68,26 @@ const ptBR = {
     success: "Concluido!",
     failure: "A operacao falhou.",
   },
+  mirrors: {
+    title: "Escolha a fonte de download",
+    default: "Espelhos publicos (ManifestHub)",
+    maniluaUnderConstruction: "API Manilua (em desenvolvimento)",
+    maniluaDisabled: "",
+    manilua: "API Manilua (requer chave)",
+  },
+  auth: {
+    title: "Chave da API Manilua",
+    instructions: "Informe sua chave da API Manilua. Voce pode obtela no painel do Manilua.",
+    placeholder: "manilua_xxxxxxxxxxxxxxxxx",
+    example: "Exemplo: manilua_abc123...",
+    save: "Salvar",
+    saving: "Salvando...",
+    required: "A chave e obrigatoria.",
+    invalid: "Chave invalida. Tente novamente.",
+    validationFailed: "Falha na validacao da chave. Verifique a chave e tente novamente.",
+    error: "Erro de validacao",
+  },
 };
 
 export default ptBR;
+

@@ -68,6 +68,24 @@ const en = {
     success: "All done!",
     failure: "Operation failed.",
   },
+  mirrors: {
+    title: "Choose download source",
+    default: "Public mirrors (ManifestHub)",
+    maniluaUnderConstruction: "Manilua API (in development)",
+    maniluaDisabled: "",
+  },
+  auth: {
+    title: "Manilua API Key",
+    instructions: "Enter your Manilua API key. You can obtain it from the Manilua dashboard.",
+    placeholder: "manilua_xxxxxxxxxxxxxxxxx",
+    example: "Example: manilua_abc123...",
+    save: "Save",
+    saving: "Saving...",
+    required: "API key is required.",
+    invalid: "API key is invalid. Please try again.",
+    validationFailed: "API key validation failed. Please verify the key and try again.",
+    error: "Validation error",
+  },
 };
 
 export default en;

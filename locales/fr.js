@@ -68,6 +68,26 @@ const fr = {
     success: "Termine !",
     failure: "L'operation a echoue.",
   },
+  mirrors: {
+    title: "Choisissez la source de telechargement",
+    default: "Miroirs publics (ManifestHub)",
+    maniluaUnderConstruction: "API Manilua (en cours de developpement)",
+    maniluaDisabled: "",
+    manilua: "API Manilua (cle requise)",
+  },
+  auth: {
+    title: "Cle API Manilua",
+    instructions: "Saisissez votre cle API Manilua. Vous pouvez l'obtenir depuis le tableau de bord Manilua.",
+    placeholder: "manilua_xxxxxxxxxxxxxxxxx",
+    example: "Exemple : manilua_abc123...",
+    save: "Enregistrer",
+    saving: "Enregistrement...",
+    required: "La cle est obligatoire.",
+    invalid: "Cle invalide. Veuillez reessayer.",
+    validationFailed: "La validation de la cle a echoue. Verifiez la cle et reessayez.",
+    error: "Erreur de validation",
+  },
 };
 
 export default fr;
+

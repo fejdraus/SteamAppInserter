@@ -24,11 +24,29 @@ type BackendInstallDlcsResponse = {
 
 type RawBackendResponse = BackendInstallResponse | BackendInstallDlcsResponse | boolean | string | null | undefined;
 
-const getDlcListRpc = callable<[{ appid: string }], RawBackendResponse>('Backend.get_dlc_list');
-const installDlcsRpc = callable<[{ appid: string; dlcs: string[] }], RawBackendResponse>('Backend.install_dlcs');
+type ApiStatus = {
+    hasKey: boolean;
+    isValid: boolean;
+    maskedKey: string;
+    checked: boolean;
+    message?: string;
+};
+
+const getDlcListRpc = callable<[{ appid: string; mirror?: string }], RawBackendResponse>('Backend.get_dlc_list');
+const installDlcsRpc = callable<[{ appid: string; dlcs: string[]; mirror?: string }], RawBackendResponse>('Backend.install_dlcs');
 const deletegame = callable<[{ id: string }], boolean>('Backend.deletelua');
 const checkPirated = callable<[{ id: string }], boolean>('Backend.checkpirated');
 const restartt = callable<[], boolean>('Backend.restart');
+const setManiluaApiKeyRpc = callable<[{ api_key: string }], RawBackendResponse>('Backend.set_manilua_api_key');
+const getManiluaApiStatusRpc = callable<[], RawBackendResponse>('Backend.get_manilua_api_status');
+
+let isBusy = false;
+const apiState: ApiStatus = {
+    hasKey: false,
+    isValid: false,
+    maskedKey: '',
+    checked: false,
+};
 
 const createDialogButton = (label: string, variant: 'primary' | 'secondary' = 'primary'): HTMLButtonElement => {
     const button = document.createElement('button');
@@ -342,6 +360,438 @@ const showProgressDialog = (initial: ProgressStatusKey = 'preparing'): ProgressD
     return { setStatus, close };
 };
 
+type MirrorId = 'default' | 'manilua';
+
+type MirrorOption = {
+    id: MirrorId;
+    labelKey: string;
+    requiresApiKey: boolean;
+};
+
+const MIRROR_OPTIONS: readonly MirrorOption[] = [
+    { id: 'default', labelKey: 'mirrors.default', requiresApiKey: false },
+    { id: 'manilua', labelKey: 'mirrors.maniluaUnderConstruction', requiresApiKey: true },
+] as const;
+
+type BasicBackendResponse = {
+    success: boolean;
+    message?: string;
+    error?: string;
+};
+
+const normalizeBasicResponse = (raw: RawBackendResponse): BasicBackendResponse => {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const obj = raw as Record<string, unknown>;
+        const success = obj.success !== false;
+        const message =
+            typeof obj.message === 'string'
+                ? obj.message
+                : typeof obj.details === 'string'
+                ? obj.details
+                : undefined;
+        const error = typeof obj.error === 'string' ? obj.error : undefined;
+        return { success, message, error };
+    }
+
+    if (typeof raw === 'boolean') {
+        return { success: raw };
+    }
+
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim().toLowerCase();
+        if (trimmed === 'true') {
+            return { success: true };
+        }
+        if (trimmed === 'false') {
+            return { success: false };
+        }
+        return { success: true, message: raw };
+    }
+
+    return { success: false, error: 'Unexpected response from backend.' };
+};
+
+const extractBooleanFromResponse = (raw: RawBackendResponse, fallback = false): boolean => {
+    if (typeof raw === 'boolean') {
+        return raw;
+    }
+
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim().toLowerCase();
+        if (trimmed === 'true') return true;
+        if (trimmed === 'false') return false;
+        return fallback;
+    }
+
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const obj = raw as Record<string, unknown>;
+        if (typeof obj.configured === 'boolean') {
+            return obj.configured;
+        }
+        if (typeof obj.success === 'boolean') {
+            return obj.success;
+        }
+    }
+
+    return fallback;
+};
+
+const maskApiKey = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed.length) {
+        return '';
+    }
+    if (trimmed.length <= 4) {
+        return '*'.repeat(trimmed.length);
+    }
+    const prefix = trimmed.slice(0, 4);
+    const suffix = trimmed.length > 6 ? trimmed.slice(-2) : '';
+    const middleLength = Math.max(0, trimmed.length - prefix.length - suffix.length);
+    return `${prefix}${'*'.repeat(middleLength)}${suffix}`;
+};
+
+const getApiStatus = async (force = false): Promise<ApiStatus> => {
+    if (force) {
+        apiState.checked = false;
+    }
+
+    if (apiState.checked) {
+        return { ...apiState };
+    }
+
+    try {
+        const raw = await getManiluaApiStatusRpc();
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            const obj = raw as Record<string, unknown>;
+            apiState.hasKey = Boolean(obj.hasKey);
+            apiState.isValid = obj.isValid !== false;
+            apiState.maskedKey = typeof obj.maskedKey === 'string' ? obj.maskedKey : '';
+            apiState.message = typeof obj.message === 'string' ? obj.message : undefined;
+        } else {
+            const hasKey = extractBooleanFromResponse(raw, false);
+            apiState.hasKey = hasKey;
+            apiState.isValid = hasKey;
+            apiState.maskedKey = '';
+            apiState.message = undefined;
+        }
+    } catch (error) {
+        apiState.hasKey = false;
+        apiState.isValid = false;
+        apiState.maskedKey = '';
+        apiState.message = error instanceof Error ? error.message : String(error);
+    }
+
+    apiState.checked = true;
+    return { ...apiState };
+};
+
+const showApiKeyPrompt = async (): Promise<boolean> => {
+    if (!document?.body) {
+        return false;
+    }
+
+    return await new Promise<boolean>((resolve) => {
+        const { dialog, content, actions, close } = createDialogShell(t('auth.title'));
+
+        content.innerHTML = '';
+
+        const description = document.createElement('div');
+        description.style.marginBottom = '12px';
+        description.style.fontSize = '14px';
+        description.style.opacity = '0.85';
+        description.textContent = t('auth.instructions');
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = t('auth.placeholder');
+        input.autocomplete = 'off';
+        input.style.cssText = [
+            'width: 100%',
+            'padding: 8px 12px',
+            'background: rgba(0,0,0,0.35)',
+            'border: 1px solid #5c5c5c',
+            'border-radius: 3px',
+            'color: #ffffff',
+            'font-size: 14px',
+            'box-sizing: border-box',
+        ].join(';');
+
+        const helper = document.createElement('div');
+        helper.style.marginTop = '8px';
+        helper.style.fontSize = '12px';
+        helper.style.opacity = '0.8';
+        helper.textContent = t('auth.example');
+
+        content.appendChild(description);
+        content.appendChild(input);
+        content.appendChild(helper);
+
+        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
+        const saveButton = createDialogButton(t('auth.save'), 'primary');
+
+        let settled = false;
+        const finish = (value: boolean) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            close();
+            resolve(value);
+        };
+
+        const setHelperError = (message: string) => {
+            helper.textContent = message;
+            helper.style.opacity = '1';
+            helper.style.color = '#ffa03b';
+        };
+
+        const setHelperNormal = () => {
+            helper.textContent = t('auth.example');
+            helper.style.opacity = '0.8';
+            helper.style.color = '';
+        };
+
+        cancelButton.onclick = (event) => {
+            event.preventDefault();
+            finish(false);
+        };
+
+        saveButton.onclick = async (event) => {
+            event.preventDefault();
+            const apiKey = input.value.trim();
+            if (!apiKey) {
+                input.style.borderColor = '#d94126';
+                setHelperError(t('auth.required'));
+                input.focus();
+                return;
+            }
+
+            input.style.borderColor = '';
+            setHelperNormal();
+            saveButton.disabled = true;
+            cancelButton.disabled = true;
+            saveButton.textContent = t('auth.saving');
+
+            try {
+                const raw = await setManiluaApiKeyRpc({ api_key: apiKey });
+                const result = normalizeBasicResponse(raw);
+                if (result.success) {
+                    apiState.hasKey = true;
+                    apiState.isValid = true;
+                    apiState.maskedKey = maskApiKey(apiKey);
+                    apiState.message = result.message;
+                    apiState.checked = true;
+                    finish(true);
+                } else {
+                    input.style.borderColor = '#d94126';
+                    setHelperError(result.error || result.message || t('auth.invalid'));
+                }
+            } catch (error) {
+                input.style.borderColor = '#d94126';
+                const message = error instanceof Error ? error.message : String(error);
+                setHelperError(`${t('auth.error')}: ${message}`);
+            } finally {
+                saveButton.disabled = false;
+                cancelButton.disabled = false;
+                saveButton.textContent = t('auth.save');
+            }
+        };
+
+        actions.appendChild(cancelButton);
+        actions.appendChild(saveButton);
+
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                finish(false);
+            } else if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
+                event.preventDefault();
+                saveButton.click();
+            }
+        };
+
+        dialog.addEventListener('keydown', handleKey);
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
+                event.preventDefault();
+                saveButton.click();
+            }
+        });
+
+        requestAnimationFrame(() => input.focus());
+    });
+};
+
+const ensureManiluaApiKey = async (): Promise<boolean> => {
+    let status = await getApiStatus();
+    if (status.hasKey && status.isValid !== false) {
+        return true;
+    }
+
+    if (status.hasKey && status.isValid === false) {
+        await presentMessage(t('auth.title'), status.message ?? t('auth.validationFailed'));
+    }
+
+    const configured = await showApiKeyPrompt();
+    if (!configured) {
+        return false;
+    }
+
+    await getApiStatus(true);
+    status = await getApiStatus();
+    if (!status.hasKey || status.isValid === false) {
+        await presentMessage(t('auth.title'), status.message ?? t('auth.validationFailed'));
+        return false;
+    }
+
+    return true;
+};
+
+const showMirrorSelectionModal = async (): Promise<MirrorId | null> => {
+    if (!document?.body) {
+        return 'default';
+    }
+
+    const disabledMirrors = new Set<MirrorId>(['manilua']);
+    const defaultMirror =
+        MIRROR_OPTIONS.find((option) => !disabledMirrors.has(option.id))?.id ??
+        (MIRROR_OPTIONS[0]?.id ?? 'default');
+
+    return await new Promise<MirrorId | null>((resolve) => {
+        const { dialog, content, actions, close } = createDialogShell(t('mirrors.title'));
+        const list = document.createElement('div');
+        list.style.display = 'flex';
+        list.style.flexDirection = 'column';
+        list.style.gap = '6px';
+        list.style.marginBottom = '12px';
+
+        let selected: MirrorId = defaultMirror;
+
+        MIRROR_OPTIONS.forEach((option) => {
+            const isDisabled = disabledMirrors.has(option.id);
+            const row = document.createElement('label');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '10px';
+            row.style.padding = '6px 8px';
+            row.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+            row.style.borderRadius = '4px';
+            row.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
+            if (isDisabled) {
+                row.style.opacity = '0.6';
+            }
+
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'mirror-option';
+            radio.value = option.id;
+            radio.checked = option.id === selected;
+            radio.disabled = isDisabled;
+            if (!isDisabled) {
+                radio.addEventListener('change', () => {
+                    selected = option.id;
+                });
+            }
+
+            const label = document.createElement('div');
+            label.textContent = t(option.labelKey);
+            label.style.flex = '1';
+
+            const badgeText = isDisabled
+                ? t('mirrors.maniluaDisabled')
+                : option.requiresApiKey
+                ? t('auth.title')
+                : '';
+
+            row.appendChild(radio);
+            row.appendChild(label);
+            if (badgeText) {
+                const badge = document.createElement('span');
+                badge.style.fontSize = '11px';
+                badge.style.opacity = '0.7';
+                badge.textContent = badgeText;
+                row.appendChild(badge);
+            }
+
+            row.addEventListener('click', () => {
+                if (isDisabled) {
+                    return;
+                }
+                radio.checked = true;
+                selected = option.id;
+            });
+
+            list.appendChild(row);
+        });
+
+        content.innerHTML = '';
+        content.appendChild(list);
+
+        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
+        const confirmButton = createDialogButton(t('common.ok'), 'primary');
+
+        let settled = false;
+        const finish = (value: MirrorId | null) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            close();
+            resolve(value);
+        };
+
+        cancelButton.onclick = (event) => {
+            event.preventDefault();
+            finish(null);
+        };
+
+        confirmButton.onclick = async (event) => {
+            event.preventDefault();
+            const selectedOption = MIRROR_OPTIONS.find((option) => option.id === selected);
+            if (!selectedOption) {
+                return;
+            }
+
+            if (disabledMirrors.has(selectedOption.id)) {
+                await presentMessage(t('mirrors.title'), t('mirrors.maniluaDisabled'));
+                cancelButton.disabled = false;
+                confirmButton.disabled = false;
+                return;
+            }
+
+            cancelButton.disabled = true;
+            confirmButton.disabled = true;
+
+            if (selectedOption.requiresApiKey) {
+                const ok = await ensureManiluaApiKey();
+                if (!ok) {
+                    cancelButton.disabled = false;
+                    confirmButton.disabled = false;
+                    return;
+                }
+            }
+
+            finish(selectedOption.id);
+        };
+
+        actions.appendChild(cancelButton);
+        actions.appendChild(confirmButton);
+
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                finish(null);
+            }
+        };
+
+        dialog.addEventListener('keydown', handleKey);
+    });
+};
+
+const ensureMirrorSelection = async (_force = false): Promise<MirrorId | null> => {
+    return await showMirrorSelectionModal();
+};
+
 const normalizeDlcEntry = (entry: unknown): DlcEntry | null => {
     if (!entry || typeof entry !== 'object') return null;
     const obj = entry as Record<string, unknown>;
@@ -427,7 +877,7 @@ const normalizeInstallDlcsResult = (raw: RawBackendResponse): BackendInstallDlcs
     return { success: false, details: undefined, installed: [], failed: [] };
 };
 
-const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boolean> => {
+const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: MirrorId): Promise<boolean> => {
     const normalized = dlcList.map(normalizeDlcEntry).filter((item): item is DlcEntry => item !== null);
     if (!normalized.length || !document.body) return false;
 
@@ -565,7 +1015,7 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
             const progress = showProgressDialog('preparing');
             try {
                 progress.setStatus('downloading');
-                const responseRaw = await installDlcsRpc({ appid: appId, dlcs: selected });
+                const responseRaw = await installDlcsRpc({ appid: appId, dlcs: selected, mirror });
                 const response = normalizeInstallDlcsResult(responseRaw);
 
                 if (response.success) {
@@ -705,8 +1155,13 @@ const promptSteamRestart = async (message: string, onRefreshButtons: () => Promi
  * @param dlcList List of available DLC
  * @param onRefreshButtons Callback to refresh buttons after operation
  */
-const handleDlcInstallation = async (appId: string, dlcList: DlcEntry[], onRefreshButtons: () => Promise<void>): Promise<void> => {
-    const wasInstalled = await showDlcSelection(appId, dlcList);
+const handleDlcInstallation = async (
+    appId: string,
+    dlcList: DlcEntry[],
+    onRefreshButtons: () => Promise<void>,
+    mirror: MirrorId
+): Promise<void> => {
+    const wasInstalled = await showDlcSelection(appId, dlcList, mirror);
     if (wasInstalled) {
         await promptSteamRestart(t('messages.changesApplied'), onRefreshButtons);
     } else {
@@ -722,7 +1177,13 @@ const handleDlcInstallation = async (appId: string, dlcList: DlcEntry[], onRefre
  * @param isPirated Whether game is already installed
  * @param onRefreshButtons Callback to refresh buttons after operation
  */
-const handleBaseGameInstallation = async (appId: string, addBtn: HTMLButtonElement, isPirated: boolean, onRefreshButtons: () => Promise<void>): Promise<void> => {
+const handleBaseGameInstallation = async (
+    appId: string,
+    addBtn: HTMLButtonElement,
+    isPirated: boolean,
+    onRefreshButtons: () => Promise<void>,
+    mirror: MirrorId
+): Promise<void> => {
     const shouldInstall = await confirmBaseGameInstall();
     if (!shouldInstall) {
         resetAddButton(addBtn, isPirated);
@@ -733,7 +1194,7 @@ const handleBaseGameInstallation = async (appId: string, addBtn: HTMLButtonEleme
     const progress = showProgressDialog('preparing');
     try {
         progress.setStatus('downloading');
-        const installRaw = await installDlcsRpc({ appid: appId, dlcs: [] });
+        const installRaw = await installDlcsRpc({ appid: appId, dlcs: [], mirror });
         const installResult = normalizeInstallDlcsResult(installRaw);
         if (installResult.success) {
             progress.setStatus('merging');
@@ -871,12 +1332,23 @@ export default async function WebkitMain() {
             }
             addBtn.addEventListener("click", async (e) => {
                 e.preventDefault();
+                if (isBusy) {
+                    return;
+                }
+
+                const forceMirrorSelection = e.altKey || e.shiftKey;
+                const mirror = await ensureMirrorSelection(forceMirrorSelection);
+                if (!mirror) {
+                    return;
+                }
+
+                isBusy = true;
                 addBtn.disabled = true;
                 addBtn.innerHTML = buttonLabel('LOADING');
 
                 try {
                     // Get DLC list without downloading
-                    const rawResult = await getDlcListRpc({ appid: appId });
+                    const rawResult = await getDlcListRpc({ appid: appId, mirror });
                     const dlcResult = normalizeInstallResult(rawResult);
 
                     if (!dlcResult.success) {
@@ -892,20 +1364,22 @@ export default async function WebkitMain() {
                     // Success - check if game has DLC
                     if (dlcResult.dlc && dlcResult.dlc.length) {
                         // Game has DLC - show selection dialog
-                        await handleDlcInstallation(appId, dlcResult.dlc, insertButtons);
+                        await handleDlcInstallation(appId, dlcResult.dlc, insertButtons, mirror);
                     } else if (!isPirated) {
                         // No DLC and game not installed - offer base game installation
-                        await handleBaseGameInstallation(appId, addBtn, isPirated, insertButtons);
+                        await handleBaseGameInstallation(appId, addBtn, isPirated, insertButtons, mirror);
                     } else {
                         // No DLC and game already installed - show message
-                        await presentMessage(
-                            t('alerts.noDlcTitle'),
-                            t('messages.noDlcDetails')
-                        );
-                        resetAddButton(addBtn, isPirated);
+        await presentMessage(
+            t('alerts.noDlcTitle'),
+            t('messages.noDlcDetails')
+        );
+        resetAddButton(addBtn, isPirated);
                     }
                 } catch (err) {
                     await handleAddError(err, addBtn, isPirated);
+                } finally {
+                    isBusy = false;
                 }
             });
 

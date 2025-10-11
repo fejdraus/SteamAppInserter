@@ -1,25 +1,44 @@
+import io
 import json
 import os
 import re
 import subprocess
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 import requests
 
 try:
     import Millennium
     import PluginUtils
+
     logger = PluginUtils.Logger()
 except ImportError:
     # Fallback for development/testing outside Millennium
     import logging
-    logger = logging.getLogger(__name__)
-    class Millennium:
+
+    class _FallbackLogger:
+        def __init__(self) -> None:
+            self._logger = logging.getLogger("steamappadder")
+
+        def log(self, msg: str) -> None:
+            self._logger.info(msg)
+
+        def warn(self, msg: str) -> None:
+            self._logger.warning(msg)
+
+        def error(self, msg: str) -> None:
+            self._logger.error(msg)
+
+    logger = _FallbackLogger()
+
+    class Millennium:  # type: ignore
         @staticmethod
         def steam_path():
             return os.path.expandvars(r'%PROGRAMFILES(X86)%\Steam')
+
         @staticmethod
         def ready():
             pass
@@ -31,13 +50,213 @@ MANIFEST_URLS = (
 STEAMUI_APPINFO = "https://www.steamui.com/api/get_app_name.php?appid={appid}&no_cache=1"
 HTTP_TIMEOUT = 10
 CACHE_EXPIRY_SECONDS = 300  # 5 minutes
+MANILUA_API_BASE = "https://www.piracybound.com/api"
+MANILUA_API_KEY_PREFIX = "manilua_"
+MANILUA_TIMEOUT = 30
+MANILUA_STATUS_TTL = 300
+_MANILUA_KEY_FILE = os.path.join(os.path.dirname(__file__), "manilua_api_key.txt")
+_manilua_api_key: Optional[str] = None
+_manilua_validation_cache: dict[str, Any] = {"timestamp": 0.0, "valid": None, "message": ""}
+
+try:
+    from steam_verification import get_steam_verification, refresh_steam_verification
+    _steam_verification = get_steam_verification()
+except Exception:  # pragma: no cover - fallback outside Millennium
+    _steam_verification = None
+    def refresh_steam_verification() -> None:  # type: ignore
+        return None
+
 
 # Simple in-memory cache with expiry
 _cache: dict[str, tuple[Any, float]] = {}
 
 
+def _get_manilua_key_path() -> str:
+    return _MANILUA_KEY_FILE
+
+
+def _load_manilua_api_key() -> None:
+    global _manilua_api_key
+    try:
+        path = _get_manilua_key_path()
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as handle:
+                candidate = handle.read().strip()
+                _manilua_api_key = candidate or None
+        else:
+            _manilua_api_key = None
+    except Exception as exc:
+        logger.log(f"Failed to load Manilua API key: {exc}")
+        _manilua_api_key = None
+
+
+def _save_manilua_api_key(value: Optional[str]) -> None:
+    global _manilua_api_key
+    path = _get_manilua_key_path()
+    try:
+        if value:
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(value.strip())
+            _manilua_api_key = value.strip()
+            purge = [key for key in list(_cache.keys()) if key.startswith('lua_manilua_')]
+            for key in purge:
+                _cache.pop(key, None)
+        else:
+            if os.path.isfile(path):
+                os.remove(path)
+            _manilua_api_key = None
+            purge = [key for key in list(_cache.keys()) if key.startswith('lua_manilua_')]
+            for key in purge:
+                _cache.pop(key, None)
+    except Exception as exc:
+        logger.log(f"Failed to save Manilua API key: {exc}")
+        raise
+
+
+_load_manilua_api_key()
+
+
 def getSteamPath() -> str:
     return Millennium.steam_path()
+
+
+def _default_user_agent() -> str:
+    version = "1.0.0"
+    try:
+        if _steam_verification and hasattr(_steam_verification, "millennium_version"):
+            version = _steam_verification.millennium_version or version
+    except Exception:
+        pass
+    if version == "1.0.0":
+        return "manilua-plugin/3.1.1 (Millennium)"
+    return f"manilua-plugin/{version} (Millennium)"
+
+
+def _manilua_headers(api_key: Optional[str], accept: str = "application/octet-stream") -> Dict[str, str]:
+    headers: Dict[str, str] = {
+        "Accept": accept,
+        "X-Requested-With": "steam-app-adder",
+    }
+    verification_applied = False
+    if _steam_verification:
+        try:
+            refresh_steam_verification()
+            verification_headers = _steam_verification.get_verification_headers()
+            headers.update(verification_headers)
+            verification_applied = True
+        except Exception as exc:
+            logger.log(f"Failed to apply Steam verification headers: {exc}")
+    if not verification_applied:
+        headers["User-Agent"] = _default_user_agent()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
+
+def validate_manilua_api_key(api_key: str) -> tuple[bool, str]:
+    try:
+        headers = _manilua_headers(None, "application/json")
+        headers["Content-Type"] = "application/json"
+        response = requests.post(
+            f"{MANILUA_API_BASE}/validate-api-key",
+            json={"key": api_key},
+            headers=headers,
+            timeout=MANILUA_TIMEOUT,
+        )
+        if response.status_code == 200:
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                return False, "Unexpected response while validating API key."
+            if data.get("isValid"):
+                return True, data.get("userId", "")
+            return False, data.get("message") or "API key is invalid."
+        if response.status_code == 401:
+            return False, "API key was rejected by the Manilua service."
+        return False, f"Validation request failed with HTTP {response.status_code}."
+    except Exception as exc:
+        return False, f"API key validation failed: {exc}"
+
+
+def _cached_manilua_validation(force_refresh: bool = False) -> tuple[Optional[bool], str]:
+    if not _manilua_api_key:
+        _manilua_validation_cache.update({"timestamp": 0.0, "valid": None, "message": ""})
+        return None, ""
+
+    now = time.time()
+    cached_valid = _manilua_validation_cache.get("valid")
+    cached_timestamp = _manilua_validation_cache.get("timestamp", 0.0)
+    cached_message = _manilua_validation_cache.get("message", "")
+
+    if (
+        not force_refresh
+        and cached_valid is not None
+        and now - cached_timestamp < MANILUA_STATUS_TTL
+    ):
+        return bool(cached_valid), str(cached_message or "")
+
+    valid, message = validate_manilua_api_key(_manilua_api_key)
+    _manilua_validation_cache.update({"timestamp": now, "valid": valid, "message": message})
+    return valid, message
+
+
+def download_lua_manifest_manilua(appid: str, api_key: str) -> Optional[str]:
+    try:
+        headers = _manilua_headers(api_key)
+        response = requests.get(
+            f"{MANILUA_API_BASE}/file/{appid}",
+            headers=headers,
+            timeout=MANILUA_TIMEOUT,
+        )
+        if response.status_code == 401:
+            logger.log("Manilua mirror rejected the configured API key.")
+            return None
+        if response.status_code >= 400:
+            logger.log(f"Manilua mirror returned HTTP {response.status_code} for {appid}")
+            return None
+
+        content_type = (response.headers.get("Content-Type") or "").lower()
+        raw = response.content
+
+        if content_type.startswith("application/json"):
+            try:
+                data = response.json()
+                logger.log(f"Manilua mirror returned an error for {appid}: {data}")
+            except json.JSONDecodeError:
+                logger.log(f"Manilua mirror returned a JSON error for {appid}, but it could not be parsed.")
+            return None
+
+        if content_type.startswith("application/zip") or raw[:2] == b"PK":
+            try:
+                with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                    for member in archive.namelist():
+                        if member.lower().endswith(".lua"):
+                            with archive.open(member) as handle:
+                                return handle.read().decode("utf-8", errors="replace")
+                logger.log(f"Manilua mirror archive for {appid} did not contain a Lua manifest.")
+                return None
+            except Exception as exc:
+                logger.log(f"Failed to process Manilua archive for {appid}: {exc}")
+                return None
+
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            text = raw.decode("utf-8", errors="replace")
+
+        return text if text.strip() else None
+    except Exception as exc:
+        logger.log(f"Failed to download manifest from Manilua mirror for {appid}: {exc}")
+        return None
+
+
+def _mask_api_key(value: str) -> str:
+    trimmed = value.strip()
+    if len(trimmed) <= 4:
+        return '*' * len(trimmed)
+    prefix = trimmed[:4]
+    suffix = trimmed[-2:] if len(trimmed) > 6 else ''
+    return f"{prefix}{'*' * max(0, len(trimmed) - len(prefix) - len(suffix))}{suffix}"
 
 
 def _build_manifest_urls(appid: str, extension: str) -> list[str]:
@@ -77,15 +296,22 @@ def _download_text(urls: list[str]) -> Optional[str]:
     return None
 
 
-def download_lua_manifest(appid: str) -> Optional[str]:
+def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
     """Download lua manifest with caching."""
-    cache_key = f'lua_{appid}'
+    mirror_key = mirror or 'default'
+    cache_key = f'lua_{mirror_key}_{appid}'
     cached = _get_from_cache(cache_key)
     if cached is not None:
         logger.log(f"Using cached lua manifest for {appid}")
         return cached
+    if mirror_key == 'manilua':
+        if not _manilua_api_key:
+            logger.log("Manilua mirror requested but API key is not configured.")
+            return None
+        result = download_lua_manifest_manilua(appid, _manilua_api_key)
+    else:
+        result = _download_text(_build_manifest_urls(appid, '.lua'))
 
-    result = _download_text(_build_manifest_urls(appid, '.lua'))
     if result is not None:
         _set_to_cache(cache_key, result)
     return result
@@ -525,6 +751,79 @@ class Backend:
         return True
 
     @staticmethod
+    def has_manilua_api_key(payload: Any = None, **kwargs) -> dict[str, Any]:
+        """Return whether a Manilua API key is configured."""
+        return {'success': bool(_manilua_api_key), 'configured': bool(_manilua_api_key)}
+
+    @staticmethod
+    def get_manilua_api_status(payload: Any = None, **kwargs) -> dict[str, Any]:
+        """Return detailed information about the configured Manilua API key."""
+        try:
+            if not _manilua_api_key:
+                return {
+                    'success': True,
+                    'hasKey': False,
+                    'isValid': False,
+                    'maskedKey': '',
+                    'message': 'API key not configured.',
+                }
+
+            force = bool(kwargs.get('force')) if kwargs else False
+            valid, message = _cached_manilua_validation(force)
+            masked = _mask_api_key(_manilua_api_key)
+
+            return {
+                'success': True,
+                'hasKey': True,
+                'isValid': bool(valid),
+                'maskedKey': masked,
+                'message': message or '',
+            }
+        except Exception as exc:
+            logger.log(f"Failed to retrieve Manilua API key status: {exc}")
+            return {'success': False, 'error': str(exc)}
+
+    @staticmethod
+    def set_manilua_api_key(payload: Any = None, **kwargs) -> dict[str, Any]:
+        """Store and validate the Manilua API key."""
+        try:
+            api_key = None
+            if isinstance(payload, dict):
+                api_key = payload.get('api_key') or payload.get('key')
+            elif isinstance(payload, str):
+                api_key = payload
+            elif payload is not None:
+                api_key = str(payload)
+
+            if api_key is None and kwargs:
+                api_key = kwargs.get('api_key') or kwargs.get('key')
+
+            if not api_key or not isinstance(api_key, str):
+                return {'success': False, 'error': 'API key is required.'}
+
+            candidate = api_key.strip()
+            if not candidate:
+                return {'success': False, 'error': 'API key is required.'}
+
+            if not candidate.startswith(MANILUA_API_KEY_PREFIX):
+                return {
+                    'success': False,
+                    'error': f'API key must start with {MANILUA_API_KEY_PREFIX}.'
+                }
+
+            valid, message = validate_manilua_api_key(candidate)
+            if not valid:
+                return {'success': False, 'error': message or 'API key validation failed.'}
+
+            _save_manilua_api_key(candidate)
+            _cached_manilua_validation(force_refresh=True)
+            logger.log('Manilua API key stored.')
+            return {'success': True, 'message': message or 'API key saved.'}
+        except Exception as exc:
+            logger.log(f"Failed to save Manilua API key: {exc}")
+            return {'success': False, 'error': str(exc)}
+
+    @staticmethod
     def get_dlc_list(payload: Any = None, **kwargs) -> dict[str, Any]:
         """
         Get DLC list without downloading anything.
@@ -547,12 +846,16 @@ class Backend:
             logger.log(details)
             return {'success': False, 'details': details, 'dlc': [], 'appid': ''}
 
+        mirror = str(data.get('mirror') or 'default').strip() or 'default'
         # Verify main game manifest exists before showing DLC
-        main_game_manifest = download_lua_manifest(appid)
+        main_game_manifest = download_lua_manifest(appid, mirror)
         if not main_game_manifest:
             game_info = fetch_game_info(appid)
             name = game_info.get('name') if game_info else 'Unknown'
-            details = f"Manifest for {appid} ({name}) is not available on the public mirrors."
+            if mirror == 'manilua':
+                details = f"Manifest for {appid} ({name}) is not available via the Manilua mirror. Please check your API key."
+            else:
+                details = f"Manifest for {appid} ({name}) is not available on the public mirrors."
             logger.log(details)
             return {'success': False, 'details': details, 'dlc': [], 'appid': appid}
 
@@ -602,14 +905,23 @@ class Backend:
                 continue
             requested.append(candidate)
 
+        mirror = str(data.get('mirror') or 'default').strip() or 'default'
+        if mirror == 'manilua' and not _manilua_api_key:
+            details = 'The Manilua mirror requires a valid API key.'
+            logger.log(details)
+            return {'success': False, 'details': details, 'installed': [], 'failed': requested}
+
         # Check if base game file exists, if not - download it
         base_game_path = get_manifest_path(appid)
         if not os.path.isfile(base_game_path):
             logger.log(f'Base game manifest not found, downloading for {appid}')
             # Download and process base game manifest
-            lua_content = download_lua_manifest(appid)
+            lua_content = download_lua_manifest(appid, mirror)
             if not lua_content:
-                details = f'Manifest for {appid} is not available on the public mirrors.'
+                if mirror == 'manilua':
+                    details = f'Manifest for {appid} is not available via the Manilua mirror. Please verify your API key.'
+                else:
+                    details = f'Manifest for {appid} is not available on the public mirrors.'
                 logger.log(details)
                 return {'success': False, 'details': details, 'installed': [], 'failed': requested}
 
