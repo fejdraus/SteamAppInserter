@@ -1,5 +1,6 @@
 // @ts-ignore
 import { ShowMessageBox, callable } from '@steambrew/webkit';
+import { initI18n, t } from './i18n.js';
 
 type DlcEntry = {
     appid: string;
@@ -143,7 +144,7 @@ const presentMessage = async (title: string, message: string): Promise<void> => 
             await Promise.resolve(ShowMessageBox({ title, message }));
             return;
         }
-        alert(message);
+        alert(`${title}\n\n${message}`);
         return;
     }
 
@@ -165,7 +166,7 @@ const presentMessage = async (title: string, message: string): Promise<void> => 
             resolve();
         };
 
-        const okButton = createDialogButton('OK', 'primary');
+        const okButton = createDialogButton(t('common.ok'), 'primary');
         okButton.addEventListener('click', finish);
         actions.appendChild(okButton);
 
@@ -181,7 +182,12 @@ const presentMessage = async (title: string, message: string): Promise<void> => 
     });
 };
 
-const presentConfirmation = async ({ title, message, confirmLabel = 'OK', cancelLabel = 'Cancel' }: ConfirmationOptions): Promise<boolean> => {
+const presentConfirmation = async ({
+    title,
+    message,
+    confirmLabel = t('common.ok'),
+    cancelLabel = t('common.cancel'),
+}: ConfirmationOptions): Promise<boolean> => {
     if (!document.body) {
         return confirm(message);
     }
@@ -258,7 +264,7 @@ const normalizeInstallResult = (raw: RawBackendResponse): BackendInstallResponse
         const dlcRaw = Array.isArray(obj.dlc) ? obj.dlc : [];
         const dlc = dlcRaw.map(normalizeDlcEntry).filter((item): item is DlcEntry => item !== null);
         const success = Boolean(obj.success);
-        const details = toNonEmptyString(obj.details, success ? '' : 'Manifest not found on public mirrors. Please request manual access.');
+        const details = toNonEmptyString(obj.details, success ? '' : t('errors.manifestMissing'));
         const appid = toNonEmptyString(obj.appid, undefined);
         return { success, details, dlc, appid };
     }
@@ -270,7 +276,7 @@ const normalizeInstallResult = (raw: RawBackendResponse): BackendInstallResponse
         } catch {
             const lower = raw.toLowerCase().trim();
             if (lower === 'true') return { success: true, details: '', dlc: [] };
-            if (lower === 'false') return { success: false, details: 'Manifest not found on public mirrors. Please request manual access.', dlc: [] };
+            if (lower === 'false') return { success: false, details: t('errors.manifestMissing'), dlc: [] };
             return { success: false, details: raw, dlc: [] };
         }
     }
@@ -278,12 +284,12 @@ const normalizeInstallResult = (raw: RawBackendResponse): BackendInstallResponse
     if (typeof raw === 'boolean') {
         return {
             success: raw,
-            details: raw ? '' : 'Manifest not found on public mirrors. Please request manual access.',
+            details: raw ? '' : t('errors.manifestMissing'),
             dlc: [],
         };
     }
 
-    return { success: false, details: 'Manifest not found on public mirrors. Please request manual access.', dlc: [] };
+    return { success: false, details: t('errors.manifestMissing'), dlc: [] };
 };
 
 const toIdArray = (value: unknown): string[] => {
@@ -329,8 +335,8 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
 
     return await new Promise<boolean>((resolve) => {
         const { dialog, content, actions, close } = createDialogShell(
-            'Select DLC to add',
-            "Select DLC to add. Uncheck any you don't want to add."
+            t('dialogs.selectDlc.title'),
+            t('dialogs.selectDlc.subtitle')
         );
 
         content.style.margin = '0';
@@ -356,14 +362,14 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
 
         const masterCheckbox = document.createElement('input');
         masterCheckbox.type = 'checkbox';
-        masterCheckbox.title = 'Select all DLC';
+        masterCheckbox.title = t('dialogs.selectDlc.selectAll');
         masterCheckbox.style.transform = 'scale(1.1)';
         masterCheckbox.style.cursor = 'pointer';
         masterCheckbox.dataset.role = 'master';
         masterRow.appendChild(masterCheckbox);
 
         const masterText = document.createElement('div');
-        masterText.textContent = 'Select all DLC';
+        masterText.textContent = t('dialogs.selectDlc.selectAll');
         masterText.style.fontWeight = '600';
         masterRow.appendChild(masterText);
 
@@ -398,13 +404,15 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
 
             const textContainer = document.createElement('div');
             const mainLine = document.createElement('div');
-            mainLine.textContent = entry.name && entry.name.trim().length ? entry.name : 'DLC ' + entry.appid;
+            mainLine.textContent = entry.name && entry.name.trim().length
+                ? entry.name
+                : t('labels.dlcWithId', { id: entry.appid });
             const secondary = document.createElement('div');
             secondary.style.fontSize = '12px';
             secondary.style.opacity = '0.7';
             const parts: string[] = [];
             if (entry.alreadyInstalled) {
-                parts.push('already added');
+                parts.push(t('dialogs.selectDlc.alreadyAdded'));
                 checkbox.checked = true;
             }
             secondary.textContent = parts.join(' - ');
@@ -427,8 +435,8 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
             }
         });
 
-        const cancelButton = createDialogButton('Cancel', 'secondary');
-        const confirmButton = createDialogButton('Add selected/Remove unselected', 'primary');
+        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
+        const confirmButton = createDialogButton(t('dialogs.selectDlc.confirm'), 'primary');
 
         let settled = false;
         const finish = (wasInstalled: boolean) => {
@@ -464,11 +472,14 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
                     finish(true);
                 } else {
                     setDisabled(false);
-                    await presentMessage('Adding failed', response.details || 'Failed to adding selected DLC');
+                    await presentMessage(t('alerts.addingFailedTitle'), response.details || t('errors.failedAddSelectedDlc'));
                 }
             } catch (error) {
                 setDisabled(false);
-                await presentMessage('Adding failed', 'Error: ' + (error instanceof Error ? error.message : error));
+                await presentMessage(
+                    t('alerts.addingFailedTitle'),
+                    t('common.errorWithMessage', { message: error instanceof Error ? error.message : String(error) })
+                );
             }
         });
 
@@ -498,10 +509,10 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
 
 const confirmBaseGameInstall = async (): Promise<boolean> => {
     return presentConfirmation({
-        title: 'Add to library',
-        message: 'This game has no DLC. Do you want to add it to your library?',
-        confirmLabel: 'Add game',
-        cancelLabel: 'Cancel',
+        title: t('dialogs.baseInstall.title'),
+        message: t('dialogs.baseInstall.message'),
+        confirmLabel: t('dialogs.baseInstall.confirm'),
+        cancelLabel: t('common.cancel'),
     });
 };
 
@@ -542,17 +553,16 @@ const WAIT_FOR_ELEMENT_TIMEOUT = 20000;
 const MUTATION_OBSERVER_THROTTLE_MS = 500;
 const RETRY_INSERT_DELAY_MS = 1000;
 
-// UI Text Constants
-const UI_TEXT = {
-    BUTTONS: {
-        ADD_TO_LIBRARY: 'Add to library',
-        EDIT_DLC_LIBRARY: 'Edit DLC library',
-        REMOVE_FROM_LIBRARY: 'Remove from library',
-        LOADING: 'Loading...',
-        ADDING: 'Adding...',
-        REMOVING: 'Removing...',
-    },
+const BUTTON_KEYS = {
+    ADD_TO_LIBRARY: 'buttons.addToLibrary',
+    EDIT_DLC_LIBRARY: 'buttons.editDlcLibrary',
+    REMOVE_FROM_LIBRARY: 'buttons.removeFromLibrary',
+    LOADING: 'buttons.loading',
+    ADDING: 'buttons.adding',
+    REMOVING: 'buttons.removing',
 } as const;
+
+const buttonLabel = (key: keyof typeof BUTTON_KEYS): string => `<span>${t(BUTTON_KEYS[key])}</span>`;
 
 /**
  * Reset add button to initial state with appropriate label
@@ -560,8 +570,8 @@ const UI_TEXT = {
 const resetAddButton = (button: HTMLButtonElement, isPirated: boolean): void => {
     button.disabled = false;
     button.innerHTML = isPirated
-        ? `<span>${UI_TEXT.BUTTONS.EDIT_DLC_LIBRARY}</span>`
-        : `<span>${UI_TEXT.BUTTONS.ADD_TO_LIBRARY}</span>`;
+        ? buttonLabel('EDIT_DLC_LIBRARY')
+        : buttonLabel('ADD_TO_LIBRARY');
 };
 
 /**
@@ -572,10 +582,10 @@ const resetAddButton = (button: HTMLButtonElement, isPirated: boolean): void => 
  */
 const promptSteamRestart = async (message: string, onRefreshButtons: () => Promise<void>): Promise<void> => {
     const restart = await presentConfirmation({
-        title: 'Restart Steam',
-        message: `${message} Steam needs to restart. Restart now?`,
-        confirmLabel: 'Restart now',
-        cancelLabel: 'Later',
+        title: t('dialogs.restart.title'),
+        message: t('dialogs.restart.message', { details: message }),
+        confirmLabel: t('dialogs.restart.confirm'),
+        cancelLabel: t('dialogs.restart.cancel'),
     });
 
     if (restart) {
@@ -594,7 +604,7 @@ const promptSteamRestart = async (message: string, onRefreshButtons: () => Promi
 const handleDlcInstallation = async (appId: string, dlcList: DlcEntry[], onRefreshButtons: () => Promise<void>): Promise<void> => {
     const wasInstalled = await showDlcSelection(appId, dlcList);
     if (wasInstalled) {
-        await promptSteamRestart('Changes applied.', onRefreshButtons);
+        await promptSteamRestart(t('messages.changesApplied'), onRefreshButtons);
     } else {
         // Cancel was clicked, just refresh buttons
         await onRefreshButtons();
@@ -615,19 +625,25 @@ const handleBaseGameInstallation = async (appId: string, addBtn: HTMLButtonEleme
         return;
     }
 
-    addBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.ADDING}</span>`;
+    addBtn.innerHTML = buttonLabel('ADDING');
     try {
         const installRaw = await installDlcsRpc({ appid: appId, dlcs: [] });
         const installResult = normalizeInstallDlcsResult(installRaw);
         if (installResult.success) {
-            await promptSteamRestart('Game added successfully!', onRefreshButtons);
+            await promptSteamRestart(t('messages.gameAdded'), onRefreshButtons);
         } else {
-            await presentMessage("Unable to add game", installResult.details || "Failed to install the base game.");
+            await presentMessage(
+                t('alerts.unableAddTitle'),
+                installResult.details || t('errors.failedInstallBaseGame')
+            );
             resetAddButton(addBtn, isPirated);
         }
     } catch (installErr) {
         const errorMessage = installErr instanceof Error ? installErr.message : String(installErr);
-        await presentMessage("Unable to add game", "Error: " + errorMessage);
+        await presentMessage(
+            t('alerts.unableAddTitle'),
+            t('common.errorWithMessage', { message: errorMessage })
+        );
         resetAddButton(addBtn, isPirated);
     }
 };
@@ -637,11 +653,16 @@ const handleBaseGameInstallation = async (appId: string, addBtn: HTMLButtonEleme
  */
 const handleAddError = async (error: unknown, addBtn: HTMLButtonElement, isPirated: boolean): Promise<void> => {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await presentMessage("Unable to get DLC list", "Error: " + errorMessage);
+    await presentMessage(
+        t('alerts.unableGetDlcTitle'),
+        t('common.errorWithMessage', { message: errorMessage })
+    );
     resetAddButton(addBtn, isPirated);
 };
 
-export default function WebkitMain() {
+export default async function WebkitMain() {
+    await initI18n();
+
     if (!/^https:\/\/store\.steampowered\.com\/app\//.test(location.href)) return;
 
     const waitForEl = (selector: string, timeout = WAIT_FOR_ELEMENT_TIMEOUT) => new Promise((resolve, reject) => {
@@ -682,16 +703,16 @@ export default function WebkitMain() {
                 removeBtn.type = "button";
                 removeBtn.style.marginRight = "3px";
                 removeBtn.className = "btnv6_blue_hoverfade btn_medium";
-                removeBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.REMOVE_FROM_LIBRARY}</span>`;
+                removeBtn.innerHTML = buttonLabel('REMOVE_FROM_LIBRARY');
 
                 removeBtn.addEventListener("click", async (e) => {
                     e.preventDefault();
 
                     const confirmed = await presentConfirmation({
-                        title: 'Remove from library',
-                        message: 'Are you sure you want to remove this game from your library?',
-                        confirmLabel: 'Remove',
-                        cancelLabel: 'Cancel',
+                        title: t('dialogs.remove.title'),
+                        message: t('dialogs.remove.message'),
+                        confirmLabel: t('common.remove'),
+                        cancelLabel: t('common.cancel'),
                     });
 
                     if (!confirmed) {
@@ -699,21 +720,25 @@ export default function WebkitMain() {
                     }
 
                     removeBtn.disabled = true;
-                    removeBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.REMOVING}</span>`;
+                    removeBtn.innerHTML = buttonLabel('REMOVING');
 
                     try {
                         const success = await deletegame({ id: appId });
                         if (success) {
-                            await promptSteamRestart('Game removed successfully!', insertButtons);
+                            await promptSteamRestart(t('messages.gameRemoved'), insertButtons);
                         } else {
-                            await presentMessage("Unable to remove", "Failed to remove the game!");
+                            await presentMessage(t('alerts.unableRemoveTitle'), t('errors.failedRemoveGame'));
                             removeBtn.disabled = false;
-                            removeBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.REMOVE_FROM_LIBRARY}</span>`;
+                            removeBtn.innerHTML = buttonLabel('REMOVE_FROM_LIBRARY');
                         }
                     } catch (err) {
-                        await presentMessage("Unable to remove", "Error: " + (err?.message ?? err));
+                        const message = err instanceof Error ? err.message : String(err);
+                        await presentMessage(
+                            t('alerts.unableRemoveTitle'),
+                            t('common.errorWithMessage', { message })
+                        );
                         removeBtn.disabled = false;
-                        removeBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.REMOVE_FROM_LIBRARY}</span>`;
+                        removeBtn.innerHTML = buttonLabel('REMOVE_FROM_LIBRARY');
                     }
                 });
 
@@ -723,14 +748,14 @@ export default function WebkitMain() {
                 } else {
                     container.appendChild(removeBtn);
                 }
-                addBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.EDIT_DLC_LIBRARY}</span>`;
+                addBtn.innerHTML = buttonLabel('EDIT_DLC_LIBRARY');
             } else {
-                addBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.ADD_TO_LIBRARY}</span>`;
+                addBtn.innerHTML = buttonLabel('ADD_TO_LIBRARY');
             }
             addBtn.addEventListener("click", async (e) => {
                 e.preventDefault();
                 addBtn.disabled = true;
-                addBtn.innerHTML = `<span>${UI_TEXT.BUTTONS.LOADING}</span>`;
+                addBtn.innerHTML = buttonLabel('LOADING');
 
                 try {
                     // Get DLC list without downloading
@@ -739,7 +764,10 @@ export default function WebkitMain() {
 
                     if (!dlcResult.success) {
                         // Failed to fetch DLC list
-                        await presentMessage("Unable to get DLC list", dlcResult.details ?? "Failed to fetch game information.");
+                        await presentMessage(
+                            t('alerts.unableGetDlcTitle'),
+                            dlcResult.details ?? t('errors.failedFetchInfo')
+                        );
                         resetAddButton(addBtn, isPirated);
                         return;
                     }
@@ -753,7 +781,10 @@ export default function WebkitMain() {
                         await handleBaseGameInstallation(appId, addBtn, isPirated, insertButtons);
                     } else {
                         // No DLC and game already installed - show message
-                        await presentMessage("No DLC available", "This game has no DLC to install.");
+                        await presentMessage(
+                            t('alerts.noDlcTitle'),
+                            t('messages.noDlcDetails')
+                        );
                         resetAddButton(addBtn, isPirated);
                     }
                 } catch (err) {

@@ -1,0 +1,65 @@
+const es = {
+  common: {
+    ok: "Aceptar",
+    cancel: "Cancelar",
+    remove: "Quitar",
+    errorWithMessage: "Error: {message}",
+  },
+  buttons: {
+    addToLibrary: "Añadir a la biblioteca",
+    editDlcLibrary: "Editar DLC en la biblioteca",
+    removeFromLibrary: "Quitar de la biblioteca",
+    loading: "Cargando...",
+    adding: "Añadiendo...",
+    removing: "Quitando...",
+  },
+  errors: {
+    manifestMissing: "Manifiesto no disponible en los espejos públicos. Solicita acceso manual.",
+    failedAddSelectedDlc: "No se pudieron añadir los DLC seleccionados.",
+    failedInstallBaseGame: "No se pudo instalar el juego base.",
+    failedFetchInfo: "No se pudo obtener la información del juego.",
+    failedRemoveGame: "¡No se pudo quitar el juego!",
+  },
+  alerts: {
+    addingFailedTitle: "Error al añadir",
+    unableAddTitle: "No se puede añadir el juego",
+    unableGetDlcTitle: "No se puede obtener la lista de DLC",
+    unableRemoveTitle: "No se puede quitar",
+    noDlcTitle: "No hay DLC disponibles",
+  },
+  messages: {
+    changesApplied: "Cambios aplicados.",
+    gameAdded: "¡Juego añadido correctamente!",
+    gameRemoved: "¡Juego eliminado correctamente!",
+    noDlcDetails: "Este juego no tiene DLC para instalar.",
+  },
+  dialogs: {
+    selectDlc: {
+      title: "Selecciona los DLC que quieres añadir",
+      subtitle: "Selecciona los DLC que quieras añadir. Desmarca los que no necesites.",
+      selectAll: "Seleccionar todos los DLC",
+      confirm: "Aplicar selección",
+      alreadyAdded: "ya añadido",
+    },
+    baseInstall: {
+      title: "Añadir a la biblioteca",
+      message: "Este juego no tiene DLC. ¿Quieres añadirlo a tu biblioteca?",
+      confirm: "Añadir juego",
+    },
+    restart: {
+      title: "Reiniciar Steam",
+      message: "{details} Steam necesita reiniciarse. ¿Reiniciar ahora?",
+      confirm: "Reiniciar ahora",
+      cancel: "Más tarde",
+    },
+    remove: {
+      title: "Quitar de la biblioteca",
+      message: "¿Seguro que quieres quitar este juego de tu biblioteca?",
+    },
+  },
+  labels: {
+    dlcWithId: "DLC {id}",
+  },
+};
+
+export default es;
