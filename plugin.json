@@ -3,6 +3,6 @@
     "name": "steam-app-inserter",
     "common_name": "Steam App Inserter",
     "description": "Insert apps to steam via steamtools lua.",
-    "version": "1.0.1",
-    "include": ["public"]
+    "version": "1.0.2",
+    "author": "fejdraus"
 }
