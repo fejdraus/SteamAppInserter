@@ -7,7 +7,7 @@ const uk = {
   },
   buttons: {
     addToLibrary: "Додати до бібліотеки",
-    editDlcLibrary: "Редагувати бібліотеку DLC",
+    editDlcLibrary: "Редагувати DLC у бібліотеці",
     removeFromLibrary: "Видалити з бібліотеки",
     loading: "Завантаження...",
     adding: "Додавання...",
@@ -16,16 +16,16 @@ const uk = {
   errors: {
     manifestMissing:
       "Маніфест недоступний на публічних дзеркалах. Запросіть доступ вручну.",
-    failedAddSelectedDlc: "Не вдалося додати вибрані DLC.",
+    failedAddSelectedDlc: "Не вдалося додати обрані DLC.",
     failedInstallBaseGame: "Не вдалося встановити базову гру.",
     failedFetchInfo: "Не вдалося отримати інформацію про гру.",
     failedRemoveGame: "Не вдалося видалити гру!",
   },
   alerts: {
     addingFailedTitle: "Помилка додавання",
-    unableAddTitle: "Не вдається додати гру",
-    unableGetDlcTitle: "Не вдається отримати список DLC",
-    unableRemoveTitle: "Не вдається видалити",
+    unableAddTitle: "Неможливо додати гру",
+    unableGetDlcTitle: "Неможливо отримати список DLC",
+    unableRemoveTitle: "Неможливо видалити",
     noDlcTitle: "Немає доступних DLC",
   },
   messages: {
@@ -36,20 +36,21 @@ const uk = {
   },
   dialogs: {
     selectDlc: {
-      title: "Виберіть DLC для додавання",
-      subtitle: "Позначте DLC, які хочете додати. Зніміть позначку з непотрібних.",
+      title: "Оберіть DLC для додавання",
+      subtitle:
+        "Оберіть DLC, які хочете додати. Зніміть позначки з непотрібних.",
       selectAll: "Вибрати всі DLC",
       confirm: "Застосувати вибір",
       alreadyAdded: "вже додано",
     },
     baseInstall: {
       title: "Додати до бібліотеки",
-      message: "У цієї гри немає DLC. Додати її до своєї бібліотеки?",
+      message: "У цієї гри немає DLC. Додати її до вашої бібліотеки?",
       confirm: "Додати гру",
     },
     restart: {
       title: "Перезапустити Steam",
-      message: "{details} Потрібно перезапустити Steam. Перезапустити зараз?",
+      message: "{details} Потрібно перезапустити Steam. Зробити це зараз?",
       confirm: "Перезапустити",
       cancel: "Пізніше",
     },
@@ -60,6 +61,14 @@ const uk = {
   },
   labels: {
     dlcWithId: "DLC {id}",
+  },
+  status: {
+    preparing: "Підготовка файлів...",
+    downloading: "Завантаження маніфестів...",
+    merging: "Застосування обраних DLC...",
+    removing: "Видалення з бібліотеки...",
+    success: "Готово!",
+    failure: "Операція не вдалася.",
   },
 };
 

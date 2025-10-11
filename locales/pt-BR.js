@@ -60,6 +60,14 @@ const ptBR = {
   labels: {
     dlcWithId: "DLC {id}",
   },
+  status: {
+    preparing: "Preparando arquivos...",
+    downloading: "Baixando manifestos...",
+    merging: "Mesclando selecao de DLC...",
+    removing: "Removendo da biblioteca...",
+    success: "Concluido!",
+    failure: "A operacao falhou.",
+  },
 };
 
 export default ptBR;

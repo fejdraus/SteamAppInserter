@@ -45,6 +45,11 @@ const createDialogButton = (label: string, variant: 'primary' | 'secondary' = 'p
     return button;
 };
 
+const wait = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+        window.setTimeout(resolve, Math.max(0, ms));
+    });
+
 const createDialogShell = (title: string, subtitle?: string) => {
     if (!document.body) {
         throw new Error('Document body not ready for dialog rendering.');
@@ -242,6 +247,99 @@ const toNonEmptyString = (value: unknown, fallback = ''): string => {
         return String(value);
     }
     return fallback;
+};
+
+const PROGRESS_STATUS_KEYS = {
+    preparing: 'status.preparing',
+    downloading: 'status.downloading',
+    merging: 'status.merging',
+    removing: 'status.removing',
+    success: 'status.success',
+    failure: 'status.failure',
+} as const;
+
+type ProgressStatusKey = keyof typeof PROGRESS_STATUS_KEYS;
+
+type ProgressDialog = {
+    setStatus: (status: ProgressStatusKey) => void;
+    close: (nextStatus?: ProgressStatusKey, delay?: number) => void;
+};
+
+const showProgressDialog = (initial: ProgressStatusKey = 'preparing'): ProgressDialog => {
+    if (!document?.body) {
+        return {
+            setStatus: () => undefined,
+            close: () => undefined,
+        };
+    }
+
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.background = 'rgba(0, 0, 0, 0.55)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '9999';
+
+    const panel = document.createElement('div');
+    panel.style.minWidth = '260px';
+    panel.style.maxWidth = '360px';
+    panel.style.padding = '24px 28px';
+    panel.style.background = '#171a21';
+    panel.style.borderRadius = '6px';
+    panel.style.border = '1px solid rgba(103, 193, 245, 0.45)';
+    panel.style.boxShadow = '0 18px 48px rgba(0, 0, 0, 0.45)';
+    panel.style.color = '#ffffff';
+    panel.style.fontFamily = '"Motiva Sans", Arial, sans-serif';
+    panel.style.textAlign = 'center';
+
+    const message = document.createElement('div');
+    message.style.fontSize = '15px';
+    message.style.lineHeight = '1.5';
+    message.style.minHeight = '40px';
+
+    panel.appendChild(message);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    let closed = false;
+
+    const setStatus = (status: ProgressStatusKey) => {
+        if (closed) {
+            return;
+        }
+        message.textContent = t(PROGRESS_STATUS_KEYS[status]);
+    };
+
+    const removeOverlay = () => {
+        try {
+            overlay.remove();
+        } catch {
+            const parent = overlay.parentNode;
+            if (parent) {
+                parent.removeChild(overlay);
+            }
+        }
+    };
+
+    const close = (nextStatus?: ProgressStatusKey, delay = 0) => {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        if (nextStatus) {
+            setStatus(nextStatus);
+        }
+        window.setTimeout(removeOverlay, Math.max(0, delay));
+    };
+
+    setStatus(initial);
+
+    return { setStatus, close };
 };
 
 const normalizeDlcEntry = (entry: unknown): DlcEntry | null => {
@@ -464,17 +562,23 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[]): Promise<boo
             const selected = dlcCheckboxes.filter((input) => input.checked).map((input) => input.value);
 
             setDisabled(true);
+            const progress = showProgressDialog('preparing');
             try {
+                progress.setStatus('downloading');
                 const responseRaw = await installDlcsRpc({ appid: appId, dlcs: selected });
                 const response = normalizeInstallDlcsResult(responseRaw);
 
                 if (response.success) {
+                    progress.setStatus('merging');
+                    progress.close('success', 600);
                     finish(true);
                 } else {
+                    progress.close('failure', 1200);
                     setDisabled(false);
                     await presentMessage(t('alerts.addingFailedTitle'), response.details || t('errors.failedAddSelectedDlc'));
                 }
             } catch (error) {
+                progress.close('failure', 1200);
                 setDisabled(false);
                 await presentMessage(
                     t('alerts.addingFailedTitle'),
@@ -626,12 +730,18 @@ const handleBaseGameInstallation = async (appId: string, addBtn: HTMLButtonEleme
     }
 
     addBtn.innerHTML = buttonLabel('ADDING');
+    const progress = showProgressDialog('preparing');
     try {
+        progress.setStatus('downloading');
         const installRaw = await installDlcsRpc({ appid: appId, dlcs: [] });
         const installResult = normalizeInstallDlcsResult(installRaw);
         if (installResult.success) {
+            progress.setStatus('merging');
+            progress.close('success', 600);
+            await wait(600);
             await promptSteamRestart(t('messages.gameAdded'), onRefreshButtons);
         } else {
+            progress.close('failure', 1200);
             await presentMessage(
                 t('alerts.unableAddTitle'),
                 installResult.details || t('errors.failedInstallBaseGame')
@@ -640,6 +750,7 @@ const handleBaseGameInstallation = async (appId: string, addBtn: HTMLButtonEleme
         }
     } catch (installErr) {
         const errorMessage = installErr instanceof Error ? installErr.message : String(installErr);
+        progress.close('failure', 1200);
         await presentMessage(
             t('alerts.unableAddTitle'),
             t('common.errorWithMessage', { message: errorMessage })
@@ -721,17 +832,23 @@ export default async function WebkitMain() {
 
                     removeBtn.disabled = true;
                     removeBtn.innerHTML = buttonLabel('REMOVING');
+                    const progress = showProgressDialog('removing');
 
                     try {
+                        progress.setStatus('removing');
                         const success = await deletegame({ id: appId });
                         if (success) {
+                            progress.close('success', 600);
+                            await wait(600);
                             await promptSteamRestart(t('messages.gameRemoved'), insertButtons);
                         } else {
+                            progress.close('failure', 1200);
                             await presentMessage(t('alerts.unableRemoveTitle'), t('errors.failedRemoveGame'));
                             removeBtn.disabled = false;
                             removeBtn.innerHTML = buttonLabel('REMOVE_FROM_LIBRARY');
                         }
                     } catch (err) {
+                        progress.close('failure', 1200);
                         const message = err instanceof Error ? err.message : String(err);
                         await presentMessage(
                             t('alerts.unableRemoveTitle'),

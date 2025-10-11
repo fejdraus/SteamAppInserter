@@ -2,7 +2,6 @@ import en from "../locales/en.js";
 import es from "../locales/es.js";
 import fr from "../locales/fr.js";
 import ptBR from "../locales/pt-BR.js";
-import ru from "../locales/ru.js";
 import uk from "../locales/uk.js";
 
 const FALLBACK_LOCALE = "en";
@@ -12,7 +11,6 @@ const STATIC_TRANSLATIONS = {
   es,
   fr,
   "pt-BR": ptBR,
-  ru,
   uk,
 };
 
@@ -31,7 +29,6 @@ function normaliseLocale(locale) {
   if (lower.startsWith("en")) return "en";
   if (lower.startsWith("es")) return "es";
   if (lower.startsWith("fr")) return "fr";
-  if (lower.startsWith("ru")) return "ru";
   if (lower === "ua" || lower.startsWith("uk")) return "uk";
   if (lower === "ukrainian") return "uk";
 

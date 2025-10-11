@@ -60,6 +60,14 @@ const fr = {
   labels: {
     dlcWithId: "DLC {id}",
   },
+  status: {
+    preparing: "Preparation des fichiers...",
+    downloading: "Telechargement des manifestes...",
+    merging: "Fusion des selections de DLC...",
+    removing: "Retrait de la bibliotheque...",
+    success: "Termine !",
+    failure: "L'operation a echoue.",
+  },
 };
 
 export default fr;
