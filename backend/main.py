@@ -120,6 +120,25 @@ def getSteamPath() -> str:
     return Millennium.steam_path()
 
 
+def create_message(message_code: str, fallback: str, **params) -> dict[str, Any]:
+    """
+    Create a localized message response.
+
+    Args:
+        message_code: The i18n key for the message (e.g., 'backend.manifestAlreadyExists')
+        fallback: Fallback English text for backward compatibility
+        **params: Parameters for message interpolation
+
+    Returns:
+        Dictionary with message_code, message_params, and details (fallback)
+    """
+    return {
+        'message_code': message_code,
+        'message_params': params,
+        'details': fallback  # Fallback for backward compatibility
+    }
+
+
 def _default_user_agent() -> str:
     version = "1.0.0"
     try:
@@ -167,15 +186,23 @@ def validate_manilua_api_key(api_key: str) -> tuple[bool, str]:
             try:
                 data = response.json()
             except json.JSONDecodeError:
-                return False, "Unexpected response while validating API key."
+                msg = create_message('backend.unexpectedValidationResponse', 'Unexpected response while validating API key.')
+                return False, json.dumps(msg)
             if data.get("isValid"):
                 return True, data.get("userId", "")
-            return False, data.get("message") or "API key is invalid."
+            server_message = data.get("message")
+            if server_message:
+                return False, server_message  # Return server message as-is
+            msg = create_message('backend.apiKeyInvalid', 'API key is invalid.')
+            return False, json.dumps(msg)
         if response.status_code == 401:
-            return False, "API key was rejected by the Manilua service."
-        return False, f"Validation request failed with HTTP {response.status_code}."
+            msg = create_message('backend.apiKeyRejected', 'API key was rejected by the Manilua service.')
+            return False, json.dumps(msg)
+        msg = create_message('backend.validationRequestFailed', f'Validation request failed with HTTP {response.status_code}.', status=response.status_code)
+        return False, json.dumps(msg)
     except Exception as exc:
-        return False, f"API key validation failed: {exc}"
+        msg = create_message('backend.validationException', f'API key validation failed: {exc}', error=str(exc))
+        return False, json.dumps(msg)
 
 
 def _cached_manilua_validation(force_refresh: bool = False) -> tuple[Optional[bool], str]:
@@ -670,7 +697,7 @@ def install_manifest_for_app(appid: str) -> dict[str, Any]:
     4. Save processed content
     5. Return DLC list for selection (always fetch fresh list from API)
     """
-    result: dict[str, Any] = {'success': False, 'details': '', 'dlc': [], 'appid': appid}
+    result: dict[str, Any] = {'success': False, 'dlc': [], 'appid': appid}
 
     # Check if file already exists
     existing_file = get_manifest_path(appid)
@@ -679,7 +706,8 @@ def install_manifest_for_app(appid: str) -> dict[str, Any]:
     if file_exists:
         logger.log(f"Manifest for {appid} already exists at {existing_file}")
         result['success'] = True
-        result['details'] = f"Manifest already exists"
+        msg = create_message('backend.manifestAlreadyExists', 'Manifest already exists')
+        result.update(msg)
         # Always fetch fresh DLC list from API (may have new DLC)
         result['dlc'] = collect_dlc_candidates(appid)
         return result
@@ -690,9 +718,10 @@ def install_manifest_for_app(appid: str) -> dict[str, Any]:
         info = fetch_game_info(appid)
         if info:
             name = info.get('name') or 'Unknown'
-            result['details'] = f"Manifest for {appid} ({name}) is not available on the public mirrors."
+            msg = create_message('backend.manifestNotAvailablePublic', f"Manifest for {appid} ({name}) is not available on the public mirrors.", appid=appid, name=name)
         else:
-            result['details'] = f"Manifest for {appid} is not available on the public mirrors."
+            msg = create_message('backend.manifestNotAvailablePublicNoName', f"Manifest for {appid} is not available on the public mirrors.", appid=appid)
+        result.update(msg)
         return result
 
     # Download .json file
@@ -701,7 +730,8 @@ def install_manifest_for_app(appid: str) -> dict[str, Any]:
         logger.log(f"JSON manifest not available for {appid}, saving raw lua")
         target = write_lua_file(appid, lua_content)
         result['success'] = True
-        result['details'] = f"Manifest saved to {target} (no JSON processing)"
+        msg = create_message('backend.manifestSavedNoJson', f"Manifest saved to {target} (no JSON processing)", target=target)
+        result.update(msg)
         result['dlc'] = collect_dlc_candidates(appid)
         return result
 
@@ -710,7 +740,8 @@ def install_manifest_for_app(appid: str) -> dict[str, Any]:
     target = write_lua_file(appid, processed_content)
 
     result['success'] = True
-    result['details'] = f"Manifest saved to {target}"
+    msg = create_message('backend.manifestSaved', f"Manifest saved to {target}", target=target)
+    result.update(msg)
     result['dlc'] = collect_dlc_candidates(appid)
     return result
 
@@ -760,25 +791,40 @@ class Backend:
         """Return detailed information about the configured Manilua API key."""
         try:
             if not _manilua_api_key:
+                msg = create_message('backend.apiKeyNotConfigured', 'API key not configured.')
                 return {
                     'success': True,
                     'hasKey': False,
                     'isValid': False,
                     'maskedKey': '',
-                    'message': 'API key not configured.',
+                    **msg,
                 }
 
             force = bool(kwargs.get('force')) if kwargs else False
             valid, message = _cached_manilua_validation(force)
             masked = _mask_api_key(_manilua_api_key)
 
-            return {
+            # Try to parse message as JSON (if it's a localized message)
+            message_data = {}
+            try:
+                if message and message.startswith('{'):
+                    message_data = json.loads(message)
+            except:
+                pass
+
+            result = {
                 'success': True,
                 'hasKey': True,
                 'isValid': bool(valid),
                 'maskedKey': masked,
-                'message': message or '',
             }
+
+            if message_data:
+                result.update(message_data)
+            else:
+                result['message'] = message or ''
+
+            return result
         except Exception as exc:
             logger.log(f"Failed to retrieve Manilua API key status: {exc}")
             return {'success': False, 'error': str(exc)}
@@ -799,26 +845,36 @@ class Backend:
                 api_key = kwargs.get('api_key') or kwargs.get('key')
 
             if not api_key or not isinstance(api_key, str):
-                return {'success': False, 'error': 'API key is required.'}
+                msg = create_message('backend.apiKeyRequired', 'API key is required.')
+                return {'success': False, **msg}
 
             candidate = api_key.strip()
             if not candidate:
-                return {'success': False, 'error': 'API key is required.'}
+                msg = create_message('backend.apiKeyRequired', 'API key is required.')
+                return {'success': False, **msg}
 
             if not candidate.startswith(MANILUA_API_KEY_PREFIX):
-                return {
-                    'success': False,
-                    'error': f'API key must start with {MANILUA_API_KEY_PREFIX}.'
-                }
+                msg = create_message('backend.apiKeyMustStartWith', f'API key must start with {MANILUA_API_KEY_PREFIX}.', prefix=MANILUA_API_KEY_PREFIX)
+                return {'success': False, **msg}
 
             valid, message = validate_manilua_api_key(candidate)
             if not valid:
-                return {'success': False, 'error': message or 'API key validation failed.'}
+                # Try to parse message as JSON (if it's a localized message)
+                try:
+                    if message and message.startswith('{'):
+                        message_data = json.loads(message)
+                        return {'success': False, **message_data}
+                except:
+                    pass
+                # Fallback to plain message
+                fallback_msg = create_message('backend.apiKeyValidationFailed', 'API key validation failed.')
+                return {'success': False, 'error': message or fallback_msg['details']}
 
             _save_manilua_api_key(candidate)
             _cached_manilua_validation(force_refresh=True)
             logger.log('Manilua API key stored.')
-            return {'success': True, 'message': message or 'API key saved.'}
+            msg = create_message('backend.apiKeySaved', 'API key saved.')
+            return {'success': True, 'message': message if message and not message.startswith('{') else msg['details'], **msg}
         except Exception as exc:
             logger.log(f"Failed to save Manilua API key: {exc}")
             return {'success': False, 'error': str(exc)}
@@ -842,9 +898,9 @@ class Backend:
             appid = extract_appid(str(payload or ''))
 
         if not appid:
-            details = 'Could not determine AppID.'
-            logger.log(details)
-            return {'success': False, 'details': details, 'dlc': [], 'appid': ''}
+            msg = create_message('backend.couldNotDetermineAppid', 'Could not determine AppID.')
+            logger.log(msg['details'])
+            return {'success': False, **msg, 'dlc': [], 'appid': ''}
 
         mirror = str(data.get('mirror') or 'default').strip() or 'default'
         # Verify main game manifest exists before showing DLC
@@ -853,13 +909,13 @@ class Backend:
             game_info = fetch_game_info(appid)
             name = game_info.get('name') if game_info else 'Unknown'
             if mirror == 'manilua':
-                details = f"Manifest for {appid} ({name}) is not available via the Manilua mirror. Please check your API key."
+                msg = create_message('backend.manifestNotAvailableManilua', f"Manifest for {appid} ({name}) is not available via the Manilua mirror. Please check your API key.", appid=appid, name=name)
             else:
-                details = f"Manifest for {appid} ({name}) is not available on the public mirrors."
-            logger.log(details)
-            return {'success': False, 'details': details, 'dlc': [], 'appid': appid}
+                msg = create_message('backend.manifestNotAvailablePublic', f"Manifest for {appid} ({name}) is not available on the public mirrors.", appid=appid, name=name)
+            logger.log(msg['details'])
+            return {'success': False, **msg, 'dlc': [], 'appid': appid}
 
-        result: dict[str, Any] = {'success': True, 'details': '', 'dlc': [], 'appid': appid}
+        result: dict[str, Any] = {'success': True, 'dlc': [], 'appid': appid}
         result['dlc'] = collect_dlc_candidates(appid)
         return result
 
@@ -867,9 +923,9 @@ class Backend:
     def receive_frontend_message(message: str):
         appid = extract_appid(message)
         if not appid:
-            details = 'Could not determine AppID from message.'
-            logger.log(details)
-            return {'success': False, 'details': details}
+            msg = create_message('backend.couldNotDetermineAppidFromMessage', 'Could not determine AppID from message.')
+            logger.log(msg['details'])
+            return {'success': False, **msg}
 
         result = install_manifest_for_app(appid)
         return result
@@ -907,9 +963,9 @@ class Backend:
 
         mirror = str(data.get('mirror') or 'default').strip() or 'default'
         if mirror == 'manilua' and not _manilua_api_key:
-            details = 'The Manilua mirror requires a valid API key.'
-            logger.log(details)
-            return {'success': False, 'details': details, 'installed': [], 'failed': requested}
+            msg = create_message('backend.maniluaRequiresApiKey', 'The Manilua mirror requires a valid API key.')
+            logger.log(msg['details'])
+            return {'success': False, **msg, 'installed': [], 'failed': requested}
 
         # Check if base game file exists, if not - download it
         base_game_path = get_manifest_path(appid)
@@ -919,11 +975,11 @@ class Backend:
             lua_content = download_lua_manifest(appid, mirror)
             if not lua_content:
                 if mirror == 'manilua':
-                    details = f'Manifest for {appid} is not available via the Manilua mirror. Please verify your API key.'
+                    msg = create_message('backend.manifestNotAvailableManiluaNoName', f'Manifest for {appid} is not available via the Manilua mirror. Please verify your API key.', appid=appid)
                 else:
-                    details = f'Manifest for {appid} is not available on the public mirrors.'
-                logger.log(details)
-                return {'success': False, 'details': details, 'installed': [], 'failed': requested}
+                    msg = create_message('backend.manifestNotAvailablePublicNoName', f'Manifest for {appid} is not available on the public mirrors.', appid=appid)
+                logger.log(msg['details'])
+                return {'success': False, **msg, 'installed': [], 'failed': requested}
 
             json_data = download_json_manifest(appid)
             if json_data:
@@ -983,8 +1039,8 @@ class Backend:
         # Write merged content to base game file
         target = write_lua_file(appid, final_content)
 
-        message = f"Added {len(installed_ids)} DLC to {target}."
-        return {'success': True, 'details': message, 'installed': installed_ids, 'failed': []}
+        msg = create_message('backend.dlcAdded', f"Added {len(installed_ids)} DLC to {target}.", count=len(installed_ids), target=target)
+        return {'success': True, **msg, 'installed': installed_ids, 'failed': []}
 
 
 class Plugin:

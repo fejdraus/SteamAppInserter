@@ -267,6 +267,27 @@ const toNonEmptyString = (value: unknown, fallback = ''): string => {
     return fallback;
 };
 
+/**
+ * Localize a message from backend response.
+ * Checks for message_code and message_params, falls back to details/message/error.
+ */
+const localizeBackendMessage = (response: any): string => {
+    if (!response || typeof response !== 'object') {
+        return '';
+    }
+
+    const messageCode = response.message_code;
+    const messageParams = response.message_params;
+
+    // If we have a message code, use it for localization
+    if (typeof messageCode === 'string' && messageCode.length > 0) {
+        return t(messageCode, messageParams || {});
+    }
+
+    // Fallback to details/message/error
+    return toNonEmptyString(response.details || response.message || response.error, '');
+};
+
 const PROGRESS_STATUS_KEYS = {
     preparing: 'status.preparing',
     downloading: 'status.downloading',
@@ -383,13 +404,9 @@ const normalizeBasicResponse = (raw: RawBackendResponse): BasicBackendResponse =
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
         const obj = raw as Record<string, unknown>;
         const success = obj.success !== false;
-        const message =
-            typeof obj.message === 'string'
-                ? obj.message
-                : typeof obj.details === 'string'
-                ? obj.details
-                : undefined;
-        const error = typeof obj.error === 'string' ? obj.error : undefined;
+        const localizedMsg = localizeBackendMessage(obj);
+        const message = localizedMsg || undefined;
+        const error = !success && message ? message : undefined;
         return { success, message, error };
     }
 
@@ -812,7 +829,7 @@ const normalizeInstallResult = (raw: RawBackendResponse): BackendInstallResponse
         const dlcRaw = Array.isArray(obj.dlc) ? obj.dlc : [];
         const dlc = dlcRaw.map(normalizeDlcEntry).filter((item): item is DlcEntry => item !== null);
         const success = Boolean(obj.success);
-        const details = toNonEmptyString(obj.details, success ? '' : t('errors.manifestMissing'));
+        const details = localizeBackendMessage(obj) || (success ? '' : t('errors.manifestMissing'));
         const appid = toNonEmptyString(obj.appid, undefined);
         return { success, details, dlc, appid };
     }
@@ -852,7 +869,7 @@ const normalizeInstallDlcsResult = (raw: RawBackendResponse): BackendInstallDlcs
         const obj = raw as Record<string, unknown>;
         return {
             success: Boolean(obj.success),
-            details: toNonEmptyString(obj.details),
+            details: localizeBackendMessage(obj),
             installed: toIdArray(obj.installed),
             failed: toIdArray(obj.failed),
         };
