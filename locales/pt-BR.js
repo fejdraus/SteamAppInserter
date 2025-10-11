@@ -70,7 +70,7 @@ const ptBR = {
   },
   mirrors: {
     title: "Escolha a fonte de download",
-    default: "Espelhos publicos (ManifestHub)",
+    default: "Espelho público (ManifestHub)",
     maniluaUnderConstruction: "API Manilua (em desenvolvimento)",
     maniluaDisabled: "",
     manilua: "API Manilua (requer chave)",

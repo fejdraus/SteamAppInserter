@@ -70,7 +70,7 @@ const fr = {
   },
   mirrors: {
     title: "Choisissez la source de telechargement",
-    default: "Miroirs publics (ManifestHub)",
+    default: "Miroir public (ManifestHub)",
     maniluaUnderConstruction: "API Manilua (en cours de developpement)",
     maniluaDisabled: "",
     manilua: "API Manilua (cle requise)",

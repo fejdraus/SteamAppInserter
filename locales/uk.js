@@ -72,7 +72,7 @@ const uk = {
   },
   mirrors: {
     title: "Оберіть джерело завантаження",
-    default: "Публічні дзеркала (ManifestHub)",
+    default: "Публічне дзеркало (ManifestHub)",
     maniluaUnderConstruction: "API Manilua (у розробці)",
     maniluaDisabled: "",
     manilua: "API Manilua (потрібен ключ)",
