@@ -1419,14 +1419,13 @@ class Backend:
             json_data = download_json_manifest(appid)
             if json_data:
                 lua_content = process_lua_content(lua_content, json_data)
+            if mirror == 'manilua':
+                lua_content = remove_dlc_entries_from_content(lua_content, set(), appid)
 
             write_lua_file(appid, lua_content)
 
         with open(base_game_path, 'r', encoding='utf-8') as handle:
             base_content = handle.read()
-
-        # ---- извлечь метаданные DLC из Manilua файла ----
-        # Когда mirror='manilua', использовать свежий манифест из Manilua
         if mirror == 'manilua':
             logger.log(f'Extracting DLC metadata from fresh Manilua manifest for {appid}')
             manilua_fresh_content = download_lua_manifest(appid, 'manilua')
@@ -1438,8 +1437,6 @@ class Backend:
                 manilua_metadata = extract_dlc_metadata_from_lua(base_content, appid)
         else:
             manilua_metadata = extract_dlc_metadata_from_lua(base_content, appid)
-
-        # ---- инфо об игре и доступные DLC ----
         game_info = fetch_game_info(appid)
         dlc_info_map: dict[str, dict[str, Any]] = {}
         all_available_dlc: set[str] = set()
@@ -1453,16 +1450,8 @@ class Backend:
                     if dlc_appid:
                         dlc_info_map[dlc_appid] = item
                         all_available_dlc.add(dlc_appid)
-
-        # ---- ключи для DLC: с учётом mirror ----
-        # ожидается обновлённая сигнатура:
-        # fetch_dlc_decryption_keys(dlc_ids, main_appid, main_game_json: Optional[dict]=None, mirror: str='default')
         dlc_keys_map = fetch_dlc_decryption_keys(requested, appid, None, mirror)
-
-        # ---- очистка старых DLC-вставок ----
         base_content = remove_dlc_entries_from_content(base_content, set(requested), appid)
-
-        # ---- формирование DLC-вставок ----
         dlc_lines: list[str] = []
         installed_ids: list[str] = []
 

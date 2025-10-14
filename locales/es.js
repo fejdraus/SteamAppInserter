@@ -2,6 +2,7 @@ const es = {
   common: {
     ok: "Aceptar",
     cancel: "Cancelar",
+    removeAllDlc: "Eliminar todos los DLC",
     remove: "Quitar",
     errorWithMessage: "Error: {message}",
   },
@@ -113,5 +114,3 @@ const es = {
 };
 
 export default es;
-
-

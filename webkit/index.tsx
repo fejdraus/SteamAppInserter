@@ -563,7 +563,7 @@ const showApiKeyPrompt = async (): Promise<boolean> => {
         content.appendChild(input);
         content.appendChild(helper);
 
-        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
+        const cancelButton = createDialogButton(t('common.removeAllDlc'), 'secondary');
         const saveButton = createDialogButton(t('auth.save'), 'primary');
 
         let settled = false;
@@ -747,7 +747,7 @@ const showMirrorSelectionModal = async (initial: MirrorId = (currentMirror ?? 'd
         content.innerHTML = '';
         content.appendChild(list);
 
-        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
+        const cancelButton = createDialogButton(t('common.removeAllDlc'), 'secondary');
         const confirmButton = createDialogButton(t('common.ok'), 'primary');
 
         let settled = false;
@@ -874,7 +874,7 @@ const normalizeInstallDlcsResult = (raw: RawBackendResponse): BackendInstallDlcs
     return { success: false, details: undefined, installed: [], failed: [] };
 };
 
-const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: MirrorId): Promise<boolean> => {
+const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: MirrorId, isEditMode: boolean = false): Promise<boolean> => {
     const normalized = dlcList.map(normalizeDlcEntry).filter((item): item is DlcEntry => item !== null);
     if (!normalized.length || !document.body) return false;
 
@@ -958,7 +958,9 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             const parts: string[] = [];
             if (entry.alreadyInstalled) {
                 parts.push(t('dialogs.selectDlc.alreadyAdded'));
-                checkbox.checked = true;
+                // In edit mode, DLC that are already installed should be checked
+                // In add mode (new installation), they should be unchecked
+                checkbox.checked = isEditMode || false;
             }
             secondary.textContent = parts.join(' - ');
             textContainer.appendChild(mainLine);
@@ -980,7 +982,7 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             }
         });
 
-        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
+        const cancelButton = createDialogButton(t('common.removeAllDlc'), 'secondary');
         const confirmButton = createDialogButton(t('dialogs.selectDlc.confirm'), 'primary');
 
         let settled = false;
@@ -1156,14 +1158,37 @@ const handleDlcInstallation = async (
     appId: string,
     dlcList: DlcEntry[],
     onRefreshButtons: () => Promise<void>,
-    mirror: MirrorId
+    mirror: MirrorId,
+    isPirated: boolean
 ): Promise<void> => {
-    const wasInstalled = await showDlcSelection(appId, dlcList, mirror);
+    const isEditMode = isPirated;
+    const wasInstalled = await showDlcSelection(appId, dlcList, mirror, isEditMode);
     if (wasInstalled) {
         await promptSteamRestart(t('messages.changesApplied'), onRefreshButtons);
     } else {
-        // Cancel was clicked, just refresh buttons
-        await onRefreshButtons();
+        // Cancel was clicked - clean up any DLC that may have been in downloaded archive
+        // Call install_dlcs with empty DLC list to remove unwanted DLC
+        const progress = showProgressDialog('removing');
+        try {
+            progress.setStatus('removing');
+            const responseRaw = await installDlcsRpc({ appid: appId, dlcs: [], mirror });
+            const response = normalizeInstallDlcsResult(responseRaw);
+
+            if (response.success) {
+                progress.close('success', 300);
+                await wait(300);
+                // Just refresh buttons after cleaning up
+                await onRefreshButtons();
+            } else {
+                progress.close('failure', 1200);
+                // Even if cleanup failed, still refresh buttons
+                await onRefreshButtons();
+            }
+        } catch (error) {
+            progress.close('failure', 1200);
+            // Ignore cleanup errors and just refresh buttons
+            await onRefreshButtons();
+        }
     }
 };
 
@@ -1359,7 +1384,7 @@ export default async function WebkitMain() {
                     // Success - check if game has DLC
                     if (dlcResult.dlc && dlcResult.dlc.length) {
                         // Game has DLC - show selection dialog
-                        await handleDlcInstallation(appId, dlcResult.dlc, insertButtons, mirror);
+                        await handleDlcInstallation(appId, dlcResult.dlc, insertButtons, mirror, isPirated);
                     } else if (!isPirated) {
                         // No DLC and game not installed - offer base game installation
                         await handleBaseGameInstallation(appId, addBtn, isPirated, insertButtons, mirror);

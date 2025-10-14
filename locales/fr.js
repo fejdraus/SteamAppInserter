@@ -2,6 +2,7 @@ const fr = {
   common: {
     ok: "OK",
     cancel: "Annuler",
+    removeAllDlc: "Supprimer tous les DLC",
     remove: "Retirer",
     errorWithMessage: "Erreur : {message}",
   },
@@ -113,4 +114,3 @@ const fr = {
 };
 
 export default fr;
-

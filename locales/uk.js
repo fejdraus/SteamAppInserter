@@ -2,6 +2,7 @@ const uk = {
   common: {
     ok: "OK",
     cancel: "Скасувати",
+    removeAllDlc: "Видалити всі DLC",
     remove: "Видалити",
     errorWithMessage: "Помилка: {message}",
   },
@@ -115,4 +116,3 @@ const uk = {
 };
 
 export default uk;
-
