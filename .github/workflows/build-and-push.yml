@@ -1,0 +1,127 @@
+name: Build & Push Frontend
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:   # allows manual trigger
+
+permissions:
+  contents: write  # needed to push back to repo
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout repo with write permissions
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true  # allows push back
+      # 2️⃣ create json
+      - name: Generate package.json
+        run: |
+          mkdir -p frontend
+          cat > package.json << 'EOF'
+          {
+            "scripts": {
+              "dev": "millennium-ttc --build dev",
+              "build": "millennium-ttc --build prod"
+            },
+            "devDependencies": {
+              "@babel/preset-env": "^7.28.3",
+              "@babel/preset-react": "^7.27.1",
+              "@babel/traverse": "^7.28.3",
+              "@types/react": "^19.1.11",
+              "@types/react-dom": "^19.1.7",
+              "@types/webpack": "^5.28.5"
+            },
+            "type": "module",
+            "name": "steam-app-adder",
+            "version": "1.0.0",
+            "description": "A plugin to add steam apps with manifests.",
+            "main": "webkit/index.tsx",
+            "author": "fejdraus",
+            "license": "MIT",
+            "dependencies": {
+              "@steambrew/api": "^5.5.2",
+              "@steambrew/client": "^5.5.2",
+              "@steambrew/ttc": "^2.7.3",
+              "@steambrew/webkit": "^5.5.2"
+            }
+          }
+          EOF
+
+      - name: Generate plugin.json
+        run: |
+          cat > plugin.json << 'EOF'
+          {
+              "$schema": "https://raw.githubusercontent.com/SteamClientHomebrew/Millennium/main/src/sys/plugin-schema.json",
+              "name": "steam-app-adder",
+              "common_name": "Steam App Adder",
+              "description": "Adds steam apps via steamtools lua.",
+              "version": "1.0.3",
+              "include": ["public"]
+          }
+          EOF
+      - name: Generate tsconfig.json
+        run: |
+          cat > tsconfig.json << 'EOF'
+          {
+            "compilerOptions": {
+              "outDir": ".millennium/Dist",
+              "module": "ESNext",
+              "target": "ES2020",
+              "jsx": "react",
+              "declaration": false,
+              "moduleResolution": "node",
+              "noUnusedLocals": true,
+              "noUnusedParameters": true,
+              "esModuleInterop": true,
+              "noImplicitReturns": true,
+              "noImplicitThis": true,
+              "noImplicitAny": true,
+              "allowSyntheticDefaultImports": true,
+              "skipLibCheck": true,
+              "resolveJsonModule": true
+            }
+          }
+          EOF
+      - name: Generate webkit/tsconfig.json
+        run: |
+          mkdir -p webkit
+          cat > webkit/tsconfig.json << 'EOF'
+          {
+            "extends": "../tsconfig.json",
+            "compilerOptions": {
+              "esModuleInterop": true,
+              "allowSyntheticDefaultImports": true
+            },
+            "include": ["."],
+            "exclude": ["node_modules", "../frontend"]
+          }
+          EOF
+
+      # 3️⃣ Install PNPM
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      # 4️⃣ Install frontend dependencies
+      - name: Install frontend deps
+        run: pnpm install
+        working-directory: frontend
+              
+      
+      - name: Install webkit deps
+        run: pnpm run dev
+      
+
+      - name: Commit & push build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .millennium/Dist
+          git commit -m "Update frontend build [ci skip]" || echo "No changes to commit"
+          git push origin main
+
