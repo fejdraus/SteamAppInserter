@@ -31,6 +31,8 @@ except ImportError:
     class _FallbackLogger:
         def __init__(self) -> None:
             self._logger = logging.getLogger("steamappadder")
+            # Configure logger to output to stdout
+            logging.basicConfig(level=logging.INFO, format='%(message)s')
 
         def log(self, msg: str) -> None:
             self._logger.info(msg)
@@ -73,6 +75,7 @@ def _get_manilua_key_path() -> str:
 
 def _load_manilua_api_key() -> None:
     global _manilua_api_key
+    _manilua_api_key = "manilua_eBY4VFUmprrUrwcFWxD2JCXwGKQhYI8r"
     # try:
     #     path = _get_manilua_key_path()
     #     logger.log(f"Loading Manilua API key from: {path}")
@@ -531,12 +534,58 @@ def get_manifest_path(appid: str) -> str:
     return os.path.join(plugin_dir, f'{appid}.lua')
 
 
+def clean_lua_content(content: str) -> str:
+    """
+    Clean lua content by:
+    1. Removing unnecessary comments (e.g., "-- manifest & lua provided by...", "-- via manilua", "-- dlc")
+    2. Removing ALL blank lines (no blank lines at all)
+    """
+    lines = content.split('\n')
+    cleaned_lines = []
+
+    # Patterns of comments to remove
+    remove_patterns = [
+        r'--\s*manifest\s*(&|and)\s*lua\s*provided\s*by',
+        r'--\s*via\s+manilua',
+        r'--\s*https?://',  # URLs in comments
+        r'--\s*provided\s+by',
+        r'--\s*source:',
+        r'^--\s*dlc\s*$',  # Remove standalone "-- dlc" marker lines
+    ]
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Skip empty lines completely
+        if not stripped:
+            continue
+
+        # Check if this is a comment to remove
+        should_remove = False
+        if stripped.startswith('--'):
+            for pattern in remove_patterns:
+                if re.search(pattern, stripped, re.IGNORECASE):
+                    should_remove = True
+                    break
+
+        if should_remove:
+            continue
+
+        cleaned_lines.append(line)
+
+    return '\n'.join(cleaned_lines)
+
+
 def write_lua_file(appid: str, content: str) -> str:
     target_path = get_manifest_path(appid)
     plugin_dir = os.path.dirname(target_path)
     _ensure_directory(plugin_dir)
+
+    # Clean content before writing
+    cleaned_content = clean_lua_content(content)
+
     with open(target_path, 'w', encoding='utf-8') as handle:
-        normalized = content.rstrip('\r\n')
+        normalized = cleaned_content.rstrip('\r\n')
         if normalized:
             handle.write(normalized + '\n')
         else:
@@ -544,34 +593,63 @@ def write_lua_file(appid: str, content: str) -> str:
     return target_path
 
 
-def remove_dlc_entries_from_content(content: str, all_available_dlc: set[str]) -> str:
+def remove_dlc_entries_from_content(content: str, dlcs_to_remove: set[str], main_appid: str) -> str:
     """
-    Remove existing DLC entries from lua content.
-    Removes both comment lines (-- DLC: Name) and their corresponding addappid() calls.
-    Also removes addappid() calls for any DLC in all_available_dlc set.
+    Remove ALL DLC entries from lua content.
+
+    Removes:
+    1. All addappid() calls that have comments (these are DLC)
+    2. Associated addtoken() calls for removed DLC
+
+    Preserves:
+    1. Main game appid
+    2. Depot IDs (addappid with keys but NO comments - these are depot IDs of the base game)
     """
     lines = content.split('\n')
     filtered_lines = []
-    skip_next = False
+    removed_dlc_ids: set[str] = set()
 
     for line in lines:
-        # Skip comment lines that start with "-- DLC:"
-        if line.strip().startswith('-- DLC:'):
-            skip_next = True
-            continue
-        # Skip addappid lines for DLC (not main game)
-        if skip_next and 'addappid' in line:
-            skip_next = False
+        stripped = line.strip()
+
+        # Check addtoken() - skip if it's for a removed DLC
+        if 'addtoken' in line:
+            match = re.search(r'addtoken\((\d+)', line)
+            if match and match.group(1) in removed_dlc_ids:
+                continue  # Skip addtoken for removed DLC
+            # If we haven't removed this DLC yet, keep the token (will be removed in next pass)
+            filtered_lines.append(line)
             continue
 
-        # Remove addappid lines for ALL available DLC (they will be re-added if selected by user)
+        # Check if this line has addappid()
         if 'addappid' in line:
             match = re.search(r'addappid\((\d+)', line)
-            if match and match.group(1) in all_available_dlc:
-                # This addappid is for an available DLC, remove it
+            if match:
+                found_id = match.group(1)
+
+                # Keep main game appid
+                if found_id == main_appid:
+                    filtered_lines.append(line)
+                    continue
+
+                # Check if this is a depot ID (has key but NO comment)
+                has_key = ',"' in line or ', "' in line
+                has_comment = '--' in line and line.index('--') > line.index('addappid')
+
+                # If it's a depot ID (has key, no comment), keep it
+                if has_key and not has_comment:
+                    filtered_lines.append(line)
+                    continue
+
+                # If it has a comment, it's a DLC - remove it
+                if has_comment:
+                    removed_dlc_ids.add(found_id)
+                    continue
+
+                # If no key and no comment, but it's not the main appid - also remove (dangling DLC)
+                removed_dlc_ids.add(found_id)
                 continue
 
-        skip_next = False
         filtered_lines.append(line)
 
     return '\n'.join(filtered_lines).rstrip('\r\n')
@@ -646,7 +724,117 @@ def fetch_dlc_decryption_keys(dlc_ids: list[str], main_appid: str, main_game_jso
 
     return keys
 
-def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
+def extract_dlc_metadata_from_lua(content: str, main_appid: str) -> dict[str, dict[str, Any]]:
+    """
+    Extract DLC metadata from existing Manilua .lua file including comments and tokens.
+    Returns dict mapping dlc_appid -> {name, comment, token, has_key}
+
+    This allows preserving original Manilua data when re-adding DLC.
+    """
+    dlc_metadata: dict[str, dict[str, Any]] = {}
+    lines = content.split('\n')
+    in_dlc_section = False
+
+    # First pass: extract all DLC addappid() calls with comments
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        # Track DLC section
+        if stripped.startswith('--') and 'dlc' in stripped.lower() and 'addappid' not in stripped:
+            in_dlc_section = True
+            continue
+
+        # Look for addappid() calls
+        match = re.search(r'addappid\((\d+)', stripped)
+        if not match:
+            continue
+
+        found_id = match.group(1)
+
+        # Skip main game appid
+        if found_id == main_appid:
+            continue
+
+        # Check if this is a depot ID (has key but NO comment)
+        has_key = ',"' in line or ', "' in line
+        has_comment = '--' in line and line.index('--') > line.index('addappid')
+
+        # If has key but NO comment, it's a depot ID, not DLC
+        if has_key and not has_comment:
+            continue
+
+        # Only include if it has a comment OR is in DLC section
+        if not has_comment and not in_dlc_section:
+            continue
+
+        # Extract name from inline comment if present
+        name = None
+        comment = None
+        if has_comment:
+            # Extract everything after --
+            comment_part = line.split('--', 1)[1].strip()
+            comment = comment_part  # Save full comment
+            # Remove common prefixes for display name
+            for prefix in ['DLC:', 'dlc:', 'DLC', 'dlc']:
+                if comment_part.startswith(prefix):
+                    comment_part = comment_part[len(prefix):].strip()
+                    break
+            if comment_part:
+                name = comment_part
+
+        if not name:
+            name = f'DLC {found_id}'
+
+        dlc_metadata[found_id] = {
+            'name': name,
+            'comment': comment,
+            'has_key': has_key,
+            'token': None  # Will be filled in second pass
+        }
+
+    # Second pass: find addtoken() calls for DLC
+    for line in lines:
+        stripped = line.strip()
+        if 'addtoken' not in line:
+            continue
+
+        match = re.search(r'addtoken\((\d+)\s*,\s*"([^"]+)"\s*\)', stripped)
+        if match:
+            token_id = match.group(1)
+            token_value = match.group(2)
+
+            if token_id in dlc_metadata:
+                dlc_metadata[token_id]['token'] = token_value
+
+    return dlc_metadata
+
+
+def parse_dlc_from_lua(content: str, main_appid: str) -> list[dict[str, Any]]:
+    """
+    Parse DLC entries from existing Manilua .lua file.
+    Returns list of DLC with their appid and name (extracted from comments).
+
+    DLC are identified by:
+    - Having an inline comment (e.g., addappid(123) -- Name)
+    - Appearing after a "-- dlc" section marker
+
+    NOT DLC (depot IDs of base game):
+    - addappid with decryption key but NO comment (e.g., addappid(1643321,0,"key..."))
+    """
+    metadata = extract_dlc_metadata_from_lua(content, main_appid)
+    dlc_list: list[dict[str, Any]] = []
+
+    for appid, data in metadata.items():
+        dlc_list.append({
+            'appid': appid,
+            'name': data['name'],
+            'source': 'manilua'
+        })
+
+    return dlc_list
+
+
+def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str, Any]]:
     info = fetch_game_info(appid)
     if not info:
         return []
@@ -661,13 +849,46 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
     # Read main game file to check which DLC are already installed
     main_file = get_manifest_path(appid)
     installed_dlc_ids = set()
-    if os.path.isfile(main_file):
+    manilua_dlc_list: list[dict[str, Any]] = []
+
+    # When mirror='manilua', fetch fresh DLC list from Manilua instead of reading local file
+    if mirror == 'manilua' and _manilua_api_key:
+        logger.log(f"Fetching fresh DLC list from Manilua for {appid}")
+        manilua_content = download_lua_manifest(appid, 'manilua')
+        if manilua_content:
+            # Parse DLC from Manilua manifest
+            manilua_dlc_list = parse_dlc_from_lua(manilua_content, appid)
+            logger.log(f"Found {len(manilua_dlc_list)} DLC in Manilua manifest")
+        else:
+            logger.log(f"Failed to fetch Manilua manifest for {appid}, falling back to local file")
+            # Fallback to local file when API fails - parse local DLC for editing
+            if os.path.isfile(main_file):
+                try:
+                    with open(main_file, 'r', encoding='utf-8') as f:
+                        local_content = f.read()
+                        manilua_dlc_list = parse_dlc_from_lua(local_content, appid)
+                        logger.log(f"Fallback: found {len(manilua_dlc_list)} DLC in local file")
+                except Exception as e:
+                    logger.log(f"Error reading local file for fallback: {e}")
+
+        # Mark which ones are already installed by checking local file
+        if os.path.isfile(main_file):
+            try:
+                with open(main_file, 'r', encoding='utf-8') as f:
+                    local_content = f.read()
+                    for match in re.finditer(r'addappid\((\d+)', local_content):
+                        found_id = match.group(1)
+                        if found_id != appid:
+                            installed_dlc_ids.add(found_id)
+            except Exception as e:
+                logger.log(f"Error reading {main_file}: {e}")
+    elif os.path.isfile(main_file):
         try:
             with open(main_file, 'r', encoding='utf-8') as f:
                 content = f.read()
                 logger.log(f"Reading {main_file}, content length: {len(content)}")
+
                 # Find all addappid() calls in the file (with or without parameters)
-                import re
                 for match in re.finditer(r'addappid\((\d+)', content):
                     found_id = match.group(1)
                     logger.log(f"Found addappid({found_id}...) in file, main appid={appid}")
@@ -675,6 +896,10 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
                     if found_id != appid:
                         installed_dlc_ids.add(found_id)
                         logger.log(f"Added {found_id} to installed_dlc_ids")
+
+                # Parse DLC from Manilua file
+                manilua_dlc_list = parse_dlc_from_lua(content, appid)
+                logger.log(f"Found {len(manilua_dlc_list)} DLC in Manilua file")
                 logger.log(f"Total installed DLC IDs: {installed_dlc_ids}")
         except Exception as e:
             logger.log(f"Error reading {main_file}: {e}")
@@ -688,7 +913,7 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
         if main_game_json:
             logger.log(f"Loaded main game JSON manifest for {appid}")
 
-    # First pass: collect DLC info
+    # First pass: collect DLC info from SteamUI API
     dlc_items: list[tuple[str, str]] = []  # (dlc_appid, name)
     for item in related:
         if not isinstance(item, dict):
@@ -708,9 +933,13 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
         dlc_ids = [dlc_id for dlc_id, _ in dlc_items]
         dlc_keys_map = fetch_dlc_decryption_keys(dlc_ids, appid, main_game_json)
 
-    # Second pass: build candidates list
+    # Second pass: build candidates list from SteamUI API
     candidates: list[dict[str, Any]] = []
+    steamui_dlc_ids = set()
+
     for dlc_appid, name in dlc_items:
+        steamui_dlc_ids.add(dlc_appid)
+
         # Get decryption key (if applicable)
         decryption_key = dlc_keys_map.get(dlc_appid)
 
@@ -732,6 +961,20 @@ def collect_dlc_candidates(appid: str) -> list[dict[str, Any]]:
             candidate_data['decryptionKey'] = decryption_key
 
         candidates.append(candidate_data)
+
+    # Add DLC from Manilua that are NOT in SteamUI API
+    for manilua_dlc in manilua_dlc_list:
+        dlc_appid = manilua_dlc['appid']
+        if dlc_appid not in steamui_dlc_ids:
+            logger.log(f"Adding Manilua-only DLC {dlc_appid} ({manilua_dlc['name']}) to candidates")
+            # Check if already installed (for mirror='manilua', this is from local file)
+            already_installed = dlc_appid in installed_dlc_ids
+            candidates.append({
+                'appid': dlc_appid,
+                'name': manilua_dlc['name'],
+                'alreadyInstalled': already_installed,
+                'source': 'manilua'
+            })
 
     return candidates
 
@@ -1101,7 +1344,7 @@ class Backend:
             return {'success': False, **msg, 'dlc': [], 'appid': appid}
 
         result: dict[str, Any] = {'success': True, 'dlc': [], 'appid': appid}
-        result['dlc'] = collect_dlc_candidates(appid)
+        result['dlc'] = collect_dlc_candidates(appid, mirror)
         return result
 
     # TODO: Это зачем нужно?
@@ -1182,6 +1425,20 @@ class Backend:
         with open(base_game_path, 'r', encoding='utf-8') as handle:
             base_content = handle.read()
 
+        # ---- извлечь метаданные DLC из Manilua файла ----
+        # Когда mirror='manilua', использовать свежий манифест из Manilua
+        if mirror == 'manilua':
+            logger.log(f'Extracting DLC metadata from fresh Manilua manifest for {appid}')
+            manilua_fresh_content = download_lua_manifest(appid, 'manilua')
+            if manilua_fresh_content:
+                manilua_metadata = extract_dlc_metadata_from_lua(manilua_fresh_content, appid)
+                logger.log(f'Extracted metadata for {len(manilua_metadata)} DLC from Manilua')
+            else:
+                logger.log(f'Failed to fetch fresh Manilua manifest, using local file metadata')
+                manilua_metadata = extract_dlc_metadata_from_lua(base_content, appid)
+        else:
+            manilua_metadata = extract_dlc_metadata_from_lua(base_content, appid)
+
         # ---- инфо об игре и доступные DLC ----
         game_info = fetch_game_info(appid)
         dlc_info_map: dict[str, dict[str, Any]] = {}
@@ -1203,28 +1460,40 @@ class Backend:
         dlc_keys_map = fetch_dlc_decryption_keys(requested, appid, None, mirror)
 
         # ---- очистка старых DLC-вставок ----
-        base_content = remove_dlc_entries_from_content(base_content, all_available_dlc)
+        base_content = remove_dlc_entries_from_content(base_content, set(requested), appid)
 
         # ---- формирование DLC-вставок ----
         dlc_lines: list[str] = []
         installed_ids: list[str] = []
 
         for dlc_appid in requested:
-            dlc_info = dlc_info_map.get(dlc_appid, {})
-            dlc_name = dlc_info.get('name') or f'DLC {dlc_appid}'
+            # Пытаемся использовать метаданные из Manilua
+            manilua_meta = manilua_metadata.get(dlc_appid)
 
-            dlc_lines.append(f'-- DLC: {dlc_name}')
-            key = dlc_keys_map.get(dlc_appid, '').strip()
-            if key:
-                dlc_lines.append(f'addappid({dlc_appid},0,"{key}")')
+            if manilua_meta and manilua_meta.get('comment'):
+                # Используем оригинальный комментарий из Manilua
+                dlc_lines.append(f"addappid({dlc_appid}) -- {manilua_meta['comment']}")
+
+                # Добавить token, если есть
+                if manilua_meta.get('token'):
+                    dlc_lines.append(f"addtoken({dlc_appid},\"{manilua_meta['token']}\")")
             else:
-                dlc_lines.append(f'addappid({dlc_appid})')
+                # Fallback: используем данные из SteamUI API
+                dlc_info = dlc_info_map.get(dlc_appid, {})
+                dlc_name = dlc_info.get('name') or f'DLC {dlc_appid}'
+                key = dlc_keys_map.get(dlc_appid, '').strip()
+
+                # Формат: addappid(ID) -- Name (как в Manilua)
+                if key:
+                    dlc_lines.append(f'addappid({dlc_appid},0,"{key}") -- {dlc_name}')
+                else:
+                    dlc_lines.append(f'addappid({dlc_appid}) -- {dlc_name}')
 
             installed_ids.append(dlc_appid)
 
         final_content = base_content
         if dlc_lines:
-            final_content += '\n\n' + '\n'.join(dlc_lines)
+            final_content += '\n' + '\n'.join(dlc_lines)
 
         target = write_lua_file(appid, final_content)
 
@@ -1244,5 +1513,3 @@ class Plugin:
 
     def _unload(self):
         logger.log('unloading')
-
-
