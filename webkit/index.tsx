@@ -35,7 +35,7 @@ type ApiStatus = {
 let currentMirror: MirrorId | null = null;
 const getDlcListRpc = callable<[{ appid: string; mirror?: string }], RawBackendResponse>('Backend.get_dlc_list');
 const installDlcsRpc = callable<[{ appid: string; dlcs: string[]; mirror?: string }], RawBackendResponse>('Backend.install_dlcs');
-const deletegame = callable<[{ id: string }], boolean>('Backend.deletelua');
+const deletegame = callable<[{ id: string }], boolean>('Backend.delete_lua');
 const checkPirated = callable<[{ id: string }], boolean>('Backend.checkpirated');
 const restartt = callable<[], boolean>('Backend.restart');
 const setManiluaApiKeyRpc = callable<[{ api_key: string }], RawBackendResponse>('Backend.set_manilua_api_key');
@@ -563,7 +563,7 @@ const showApiKeyPrompt = async (): Promise<boolean> => {
         content.appendChild(input);
         content.appendChild(helper);
 
-        const cancelButton = createDialogButton(t('common.removeAllDlc'), 'secondary');
+        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
         const saveButton = createDialogButton(t('auth.save'), 'primary');
 
         let settled = false;
@@ -747,7 +747,7 @@ const showMirrorSelectionModal = async (initial: MirrorId = (currentMirror ?? 'd
         content.innerHTML = '';
         content.appendChild(list);
 
-        const cancelButton = createDialogButton(t('common.removeAllDlc'), 'secondary');
+        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
         const confirmButton = createDialogButton(t('common.ok'), 'primary');
 
         let settled = false;
@@ -958,8 +958,6 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             const parts: string[] = [];
             if (entry.alreadyInstalled) {
                 parts.push(t('dialogs.selectDlc.alreadyAdded'));
-                // In edit mode, DLC that are already installed should be checked
-                // In add mode (new installation), they should be unchecked
                 checkbox.checked = isEditMode || false;
             }
             secondary.textContent = parts.join(' - ');
@@ -976,13 +974,11 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
                 updateMasterState();
             });
 
-            // Skip adding a divider after the last item to avoid double borders with the list container.
             if (index === normalized.length - 1) {
                 label.style.borderBottom = 'none';
             }
         });
 
-        const cancelButton = createDialogButton(t('common.removeAllDlc'), 'secondary');
         const confirmButton = createDialogButton(t('dialogs.selectDlc.confirm'), 'primary');
 
         let settled = false;
@@ -995,7 +991,6 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
 
         const setDisabled = (state: boolean) => {
             confirmButton.disabled = state;
-            cancelButton.disabled = state;
             if (state) {
                 dialog.setAttribute('aria-busy', 'true');
             } else {
@@ -1003,13 +998,8 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             }
         };
 
-        cancelButton.addEventListener('click', () => {
-            finish(false);
-        });
-
         confirmButton.addEventListener('click', async () => {
             const selected = dlcCheckboxes.filter((input) => input.checked).map((input) => input.value);
-
             setDisabled(true);
             const progress = showProgressDialog('preparing');
             try {
@@ -1036,7 +1026,6 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             }
         });
 
-        actions.appendChild(cancelButton);
         actions.appendChild(confirmButton);
 
         const handleKey = (event: KeyboardEvent) => {

@@ -53,7 +53,7 @@ except ImportError:
         @staticmethod
         def ready():
             pass
-_MANILUA_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manilua_api_key.txt")
+_MANILUA_KEY_FILE = os.path.join(os.path.expanduser("~"), ".SteamAppInserter", "manilua_api_key.txt")
 _manilua_api_key: Optional[str] = None
 
 try:
@@ -75,24 +75,38 @@ def _get_manilua_key_path() -> str:
 
 def _load_manilua_api_key() -> None:
     global _manilua_api_key
-    _manilua_api_key = "manilua_eBY4VFUmprrUrwcFWxD2JCXwGKQhYI8r"
-    # try:
-    #     path = _get_manilua_key_path()
-    #     logger.log(f"Loading Manilua API key from: {path}")
-    #     if os.path.isfile(path):
-    #         with open(path, "r", encoding="utf-8") as handle:
-    #             candidate = handle.read().strip()
-    #             _manilua_api_key = candidate or None
-    #             if _manilua_api_key:
-    #                 logger.log(f"Loaded Manilua API key: {_mask_api_key(_manilua_api_key)}")
-    #             else:
-    #                 logger.log("API key file is empty")
-    #     else:
-    #         logger.log(f"API key file does not exist: {path}")
-    #         _manilua_api_key = None
-    # except Exception as exc:
-    #     logger.log(f"Failed to load Manilua API key: {exc}")
-    #     _manilua_api_key = None
+    try:
+        path = _get_manilua_key_path()
+        # Ensure directory exists before trying to read
+        _ensure_directory(os.path.dirname(path))
+        logger.log(f"Loading Manilua API key from: {path}")
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as handle:
+                candidate = handle.read().strip()
+                _manilua_api_key = candidate or None
+                if _manilua_api_key:
+                    logger.log(f"Loaded Manilua API key: {_mask_api_key(_manilua_api_key)}")
+                else:
+                    logger.log("API key file is empty")
+        else:
+            logger.log(f"API key file does not exist: {path}")
+            _manilua_api_key = None
+    except Exception as exc:
+        logger.log(f"Failed to load Manilua API key: {exc}")
+        _manilua_api_key = None
+
+
+def _create_empty_key_file() -> None:
+    """Create empty API key file if it doesn't exist (for initial setup)."""
+    try:
+        path = _get_manilua_key_path()
+        _ensure_directory(os.path.dirname(path))
+        if not os.path.isfile(path):
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("")
+            logger.log(f"Created empty API key file: {path}")
+    except Exception as exc:
+        logger.log(f"Failed to create empty API key file: {exc}")
 
 
 def _save_manilua_api_key(value: Optional[str]) -> None:
@@ -100,6 +114,8 @@ def _save_manilua_api_key(value: Optional[str]) -> None:
     path = _get_manilua_key_path()
     try:
         if value:
+            # Ensure directory exists
+            _ensure_directory(os.path.dirname(path))
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(value.strip())
             _manilua_api_key = value.strip()
@@ -1049,7 +1065,6 @@ def process_lua_content(lua_content: str, json_data: dict[str, Any]) -> str:
 
     return '\n'.join(filtered_lines)
 
-# TODO: Это зачем нужно?
 def install_manifest_for_app(appid: str) -> dict[str, Any]:
     """
     Install base game manifest per SteamTools logic:
@@ -1121,7 +1136,7 @@ class Backend:
         return os.path.exists(manifest_path)
 
     @staticmethod
-    def deletelua(id: str):
+    def delete_lua(id: str):
         """
         Delete all files associated with a game from Manilua archives.
         Removes files from:
@@ -1252,6 +1267,7 @@ class Backend:
         try:
             # Reload key from file in case it was created/modified after module load
             _load_manilua_api_key()
+
             if not _manilua_api_key:
                 msg = create_message('backend.apiKeyNotConfigured', 'No API key configured.')
                 return {
@@ -1279,25 +1295,23 @@ class Backend:
     def set_manilua_api_key(payload: Any = None, **kwargs) -> dict[str, Any]:
         """Store the Manilua API key without validation (like original manilua-plugin v3.2.0)."""
         try:
-            # Frontend always sends {'api_key': '...'}, so we only need to handle that format
-            api_key = None
+            # Process payload and kwargs similar to other functions
+            data: dict[str, Any] = {}
             if isinstance(payload, dict):
-                api_key = payload.get('api_key')
-
+                data.update(payload)
+            if kwargs:
+                data.update(kwargs)
+            api_key = data.get('api_key')
             if not api_key or not isinstance(api_key, str):
                 msg = create_message('backend.apiKeyRequired', 'API key is required.')
                 return {'success': False, **msg}
-
             candidate = api_key.strip()
             if not candidate:
                 msg = create_message('backend.apiKeyRequired', 'API key is required.')
                 return {'success': False, **msg}
-
             if not candidate.startswith(MANILUA_API_KEY_PREFIX):
                 msg = create_message('backend.apiKeyMustStartWith', f'API key must start with {MANILUA_API_KEY_PREFIX}.', prefix=MANILUA_API_KEY_PREFIX)
                 return {'success': False, **msg}
-
-            # Save without validation (like original plugin)
             _save_manilua_api_key(candidate)
             logger.log('Manilua API key stored.')
 
@@ -1347,7 +1361,7 @@ class Backend:
         result['dlc'] = collect_dlc_candidates(appid, mirror)
         return result
 
-    # TODO: Это зачем нужно?
+#
     @staticmethod
     def receive_frontend_message(message: str):
         appid = extract_appid(message)
@@ -1363,11 +1377,11 @@ class Backend:
     def install_dlcs(payload: Any = None, **kwargs) -> dict[str, Any]:
         """
         Install DLC per SteamTools logic:
-        1) Гарантировать наличие базового .lua (через выбранный mirror)
-        2) Удалить старые DLC-вставки
-        3) Добавить выбранные DLC (с ключами, если найдены)
+        1) Ensure base .lua file exists (via selected mirror)
+        2) Remove old DLC entries
+        3) Add selected DLC (with keys if found)
         """
-        # ---- входные данные ----
+        # ---- input data ----
         data: dict[str, Any] = {}
         if isinstance(payload, dict):
             data.update(payload)
@@ -1399,11 +1413,11 @@ class Backend:
             logger.log(msg['details'])
             return {'success': False, **msg, 'installed': [], 'failed': requested}
 
-        # ---- базовый .lua ----
+        # ---- base .lua ----
         base_game_path = get_manifest_path(appid)
         if not os.path.isfile(base_game_path):
             logger.log(f'Base game manifest not found, downloading for {appid} via mirror={mirror}')
-            lua_content = download_lua_manifest(appid, mirror)  # ВАЖНО: учитывать mirror
+            lua_content = download_lua_manifest(appid, mirror)  # IMPORTANT: consider mirror
             if not lua_content:
                 if mirror == 'manilua':
                     msg = create_message('backend.manifestNotAvailableManiluaNoName',
@@ -1451,28 +1465,33 @@ class Backend:
                         dlc_info_map[dlc_appid] = item
                         all_available_dlc.add(dlc_appid)
         dlc_keys_map = fetch_dlc_decryption_keys(requested, appid, None, mirror)
-        base_content = remove_dlc_entries_from_content(base_content, set(requested), appid)
+
+        # If no DLC selected, remove ALL existing DLC entries to install base game only
+        if not requested:
+            base_content = remove_dlc_entries_from_content(base_content, None, appid)  # None means remove all DLC
+        else:
+            base_content = remove_dlc_entries_from_content(base_content, set(requested), appid)
         dlc_lines: list[str] = []
         installed_ids: list[str] = []
 
         for dlc_appid in requested:
-            # Пытаемся использовать метаданные из Manilua
+            # Try to use metadata from Manilua
             manilua_meta = manilua_metadata.get(dlc_appid)
 
             if manilua_meta and manilua_meta.get('comment'):
-                # Используем оригинальный комментарий из Manilua
+                # Use original Manilua comment
                 dlc_lines.append(f"addappid({dlc_appid}) -- {manilua_meta['comment']}")
 
-                # Добавить token, если есть
+                # Add token if present
                 if manilua_meta.get('token'):
                     dlc_lines.append(f"addtoken({dlc_appid},\"{manilua_meta['token']}\")")
             else:
-                # Fallback: используем данные из SteamUI API
+                # Fallback: use SteamUI API data
                 dlc_info = dlc_info_map.get(dlc_appid, {})
                 dlc_name = dlc_info.get('name') or f'DLC {dlc_appid}'
                 key = dlc_keys_map.get(dlc_appid, '').strip()
 
-                # Формат: addappid(ID) -- Name (как в Manilua)
+                # Format: addappid(ID) -- Name (as in Manilua)
                 if key:
                     dlc_lines.append(f'addappid({dlc_appid},0,"{key}") -- {dlc_name}')
                 else:
