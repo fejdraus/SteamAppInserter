@@ -79,7 +79,7 @@ This plugin is part of a three-component system:
 **Steps:**
 
 1. Download `release.zip` from [releases](https://github.com/fejdraus/SteamAppInserter/releases)
-2. Extract to `Steam/plugins/steam-app-inserter/`
+2. Extract to `Steam\plugins\SteamAppInserter\`
 3. Restart Steam
 
 ---
