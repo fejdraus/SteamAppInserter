@@ -177,10 +177,10 @@ The plugin supports **two sources** for downloading manifests:
 #### Getting Manilua API Token
 
 1. **Visit** the external service: https://www.piracybound.com/manilua
-2. **Authorize** with your account
+2. **Authorize** through **Discord login**
 3. **Go to Profile Settings**
-4. **API Keys** section - click "Generate"
-5. **Copy** the token (starts with `manilua_`)
+4. **API Keys** section - click **"Generate Key"**
+5. **Copy** the generated token (starts with `manilua_`)
 6. **In the plugin:** Select "Manilua (Advanced)" mirror and paste the token when prompted
 
 > **Note:** Manilua token is optional but unlocks access to more games and DLC not available in public mirrors.
