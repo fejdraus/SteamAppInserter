@@ -1,4 +1,3 @@
-// @ts-ignore
 import { ShowMessageBox, callable } from '@steambrew/webkit';
 import { initI18n, t } from './i18n.js';
 
@@ -145,7 +144,6 @@ const createDialogShell = (title: string, subtitle?: string) => {
     };
 
     overlay.addEventListener('click', () => {
-        // Prevent accidental background clicks from doing anything.
     });
 
     requestAnimationFrame(() => {
@@ -280,12 +278,10 @@ const localizeBackendMessage = (response: any): string => {
     const messageCode = response.message_code;
     const messageParams = response.message_params;
 
-    // If we have a message code, use it for localization
     if (typeof messageCode === 'string' && messageCode.length > 0) {
         return t(messageCode, messageParams || {});
     }
 
-    // Fallback to details/message/error
     return toNonEmptyString(response.details || response.message || response.error, '');
 };
 
@@ -1075,7 +1071,6 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): (
             lastCall = now;
             func(...args);
         } else {
-            // Schedule a delayed call if not already scheduled
             if (!timeoutId) {
                 timeoutId = setTimeout(() => {
                     lastCall = Date.now();
@@ -1087,7 +1082,6 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): (
     };
 };
 
-// Constants
 const ADD_BTN_ID = "add-app-to-library-btn";
 const REMOVE_BTN_ID = "remove-app-from-library-btn";
 const CONTAINER_SELECTOR = ".apphub_OtherSiteInfo";
@@ -1155,8 +1149,6 @@ const handleDlcInstallation = async (
     if (wasInstalled) {
         await promptSteamRestart(t('messages.changesApplied'), onRefreshButtons);
     } else {
-        // Cancel was clicked - clean up any DLC that may have been in downloaded archive
-        // Call install_dlcs with empty DLC list to remove unwanted DLC
         const progress = showProgressDialog('removing');
         try {
             progress.setStatus('removing');
@@ -1166,16 +1158,13 @@ const handleDlcInstallation = async (
             if (response.success) {
                 progress.close('success', 300);
                 await wait(300);
-                // Just refresh buttons after cleaning up
                 await onRefreshButtons();
             } else {
                 progress.close('failure', 1200);
-                // Even if cleanup failed, still refresh buttons
                 await onRefreshButtons();
             }
         } catch (error) {
             progress.close('failure', 1200);
-            // Ignore cleanup errors and just refresh buttons
             await onRefreshButtons();
         }
     }
@@ -1361,7 +1350,6 @@ export default async function WebkitMain() {
                     const dlcResult = normalizeInstallResult(rawResult);
 
                     if (!dlcResult.success) {
-                        // Failed to fetch DLC list
                         await presentMessage(
                             t('alerts.unableGetDlcTitle'),
                             dlcResult.details ?? t('errors.failedFetchInfo')
@@ -1370,15 +1358,11 @@ export default async function WebkitMain() {
                         return;
                     }
 
-                    // Success - check if game has DLC
                     if (dlcResult.dlc && dlcResult.dlc.length) {
-                        // Game has DLC - show selection dialog
                         await handleDlcInstallation(appId, dlcResult.dlc, insertButtons, mirror, isPirated);
                     } else if (!isPirated) {
-                        // No DLC and game not installed - offer base game installation
                         await handleBaseGameInstallation(appId, addBtn, isPirated, insertButtons, mirror);
                     } else {
-                        // No DLC and game already installed - show message
         await presentMessage(
             t('alerts.noDlcTitle'),
             t('messages.noDlcDetails')
@@ -1409,7 +1393,6 @@ export default async function WebkitMain() {
         insertButtons();
     }
 
-    // Throttle MutationObserver callback to prevent excessive calls
     const throttledInsertCheck = throttle(() => {
         const appId = getAppId();
         if (appId && !document.getElementById(ADD_BTN_ID) && !document.getElementById(REMOVE_BTN_ID)) {
