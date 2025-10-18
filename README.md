@@ -162,10 +162,28 @@ This plugin is part of a three-component system:
 
 ### Manifest Sources
 
-The plugin downloads manifests from public mirrors:
+The plugin supports **two sources** for downloading manifests:
 
+#### Public Mirrors (Default)
 - Primary: `https://raw.githubusercontent.com/SteamAutoCracks/ManifestHub/`
 - Fallback: `https://cdn.jsdmirror.com/gh/SteamAutoCracks/ManifestHub/`
+- **No authentication required**
+
+#### Manilua Mirror (Advanced)
+- URL: `https://manilua.golde.org/`
+- **Requires API token** for enhanced compatibility
+- Access to private/locked games and extra DLC
+
+#### Getting Manilua API Token
+
+1. **Visit** the external service: https://www.piracybound.com/manilua
+2. **Authorize** with your account
+3. **Go to Profile Settings**
+4. **API Keys** section - click "Generate"
+5. **Copy** the token (starts with `manilua_`)
+6. **In the plugin:** Select "Manilua (Advanced)" mirror and paste the token when prompted
+
+> **Note:** Manilua token is optional but unlocks access to more games and DLC not available in public mirrors.
 
 ---
 
