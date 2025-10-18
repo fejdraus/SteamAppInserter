@@ -267,16 +267,24 @@ def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]
                         dest_path = os.path.join(stplug_in_dir, base_name)
                         try:
                             decoded = file_content.decode('utf-8')
-                            with open(dest_path, 'w', encoding='utf-8') as f:
-                                f.write(decoded)
+                            if not os.path.isfile(dest_path):
+                                with open(dest_path, 'w', encoding='utf-8') as f:
+                                    f.write(decoded)
+                                result['installed_files'].append(dest_path)
+                                logger.log(f"Extracted {file_name} → {dest_path}")
+                            else:
+                                logger.log(f"LUA file {dest_path} already exists, skipping overwrite")
                             lua_files_found.append(decoded)
                         except UnicodeDecodeError:
                             # Fallback to binary write
-                            with open(dest_path, 'wb') as f:
-                                f.write(file_content)
+                            if not os.path.isfile(dest_path):
+                                with open(dest_path, 'wb') as f:
+                                    f.write(file_content)
+                                result['installed_files'].append(dest_path)
+                                logger.log(f"Extracted {file_name} → {dest_path}")
+                            else:
+                                logger.log(f"LUA file {dest_path} already exists, skipping overwrite")
                             lua_files_found.append(file_content.decode('utf-8', errors='replace'))
-                        result['installed_files'].append(dest_path)
-                        logger.log(f"Extracted {file_name} → {dest_path}")
 
                     elif file_name_lower.endswith('.manifest'):
                         # .manifest files → Steam/depotcache/ (preserve original name)
@@ -867,14 +875,37 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
     installed_dlc_ids = set()
     manilua_dlc_list: list[dict[str, Any]] = []
 
-    # When mirror='manilua', fetch fresh DLC list from Manilua instead of reading local file
+    # When mirror='manilua', fetch fresh DLC list from Manilua including preserving user's DLC installations
     if mirror == 'manilua' and _manilua_api_key:
+        # First: read current local file to capture user's installed DLC status
+        user_installed_dlcs = set()
+        if os.path.isfile(main_file):
+            try:
+                with open(main_file, 'r', encoding='utf-8') as f:
+                    local_content = f.read()
+                    for match in re.finditer(r'addappid\((\d+)', local_content):
+                        found_id = match.group(1)
+                        if found_id != appid:
+                            user_installed_dlcs.add(found_id)
+                            logger.log(f"prochital user installed DLC: {found_id}")
+                    # Log DLC list from local file before downloading archive
+                    local_dlc_list = parse_dlc_from_lua(local_content, appid)
+                    local_dlc_appids = [d['appid'] for d in local_dlc_list]
+                    logger.log(f"DLC list from local file before download for {appid}: {local_dlc_appids} ({len(local_dlc_appids)} items)")
+            except Exception as e:
+                logger.log(f"Error reading {main_file}: {e}")
+
+        # Second: download and process fresh Manilua manifest
         logger.log(f"Fetching fresh DLC list from Manilua for {appid}")
         manilua_content = download_lua_manifest(appid, 'manilua')
+        logger.log(f"Skachal  {appid}")
         if manilua_content:
             # Parse DLC from Manilua manifest
             manilua_dlc_list = parse_dlc_from_lua(manilua_content, appid)
             logger.log(f"Found {len(manilua_dlc_list)} DLC in Manilua manifest")
+
+            # Use user-installed DLC status captured before download
+            installed_dlc_ids.update(user_installed_dlcs)
         else:
             logger.log(f"Failed to fetch Manilua manifest for {appid}, falling back to local file")
             # Fallback to local file when API fails - parse local DLC for editing
@@ -884,20 +915,10 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
                         local_content = f.read()
                         manilua_dlc_list = parse_dlc_from_lua(local_content, appid)
                         logger.log(f"Fallback: found {len(manilua_dlc_list)} DLC in local file")
+                        # In fallback, use addappid scanning as before
+                        installed_dlc_ids.update(user_installed_dlcs)
                 except Exception as e:
                     logger.log(f"Error reading local file for fallback: {e}")
-
-        # Mark which ones are already installed by checking local file
-        if os.path.isfile(main_file):
-            try:
-                with open(main_file, 'r', encoding='utf-8') as f:
-                    local_content = f.read()
-                    for match in re.finditer(r'addappid\((\d+)', local_content):
-                        found_id = match.group(1)
-                        if found_id != appid:
-                            installed_dlc_ids.add(found_id)
-            except Exception as e:
-                logger.log(f"Error reading {main_file}: {e}")
     elif os.path.isfile(main_file):
         try:
             with open(main_file, 'r', encoding='utf-8') as f:
