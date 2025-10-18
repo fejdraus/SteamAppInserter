@@ -1,4 +1,4 @@
-import { ShowMessageBox, callable } from '@steambrew/webkit';
+import { callable } from '@steambrew/webkit';
 import { initI18n, t } from './i18n.js';
 
 type DlcEntry = {
@@ -162,10 +162,6 @@ type ConfirmationOptions = {
 
 const presentMessage = async (title: string, message: string): Promise<void> => {
     if (!document.body) {
-        if (typeof ShowMessageBox === 'function') {
-            await Promise.resolve(ShowMessageBox({ title, message }));
-            return;
-        }
         alert(`${title}\n\n${message}`);
         return;
     }
