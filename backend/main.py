@@ -43,7 +43,7 @@ except ImportError:
 
     logger = _FallbackLogger()
 
-    class Millennium:  # type: ignore
+    class Millennium:
         @staticmethod
         def steam_path():
             return os.path.expandvars(r'%PROGRAMFILES(X86)%\Steam')
@@ -57,9 +57,9 @@ _manilua_api_key: Optional[str] = None
 try:
     from steam_verification import get_steam_verification, refresh_steam_verification
     _steam_verification = get_steam_verification()
-except Exception:  # pragma: no cover - fallback outside Millennium
+except Exception:
     _steam_verification = None
-    def refresh_steam_verification() -> None:  # type: ignore
+    def refresh_steam_verification() -> None:
         return None
 
 
@@ -93,7 +93,6 @@ def _load_manilua_api_key() -> None:
 
 
 def _create_empty_key_file() -> None:
-    """Create empty API key file if it doesn't exist (for initial setup)."""
     try:
         path = _get_manilua_key_path()
         _ensure_directory(os.path.dirname(path))
@@ -137,39 +136,25 @@ def getSteamPath() -> str:
 
 
 def get_stplug_in_path() -> str:
-    """Get path to SteamTools plugin directory (for .lua files)."""
     steam_path = getSteamPath()
     return os.path.join(steam_path, 'config', 'stplug-in')
 
 
 def get_depotcache_path() -> str:
-    """Get path to Steam depotcache directory (for .manifest files)."""
     steam_path = getSteamPath()
     return os.path.join(steam_path, 'config', 'depotcache')
 
 
 def get_stats_export_path() -> str:
-    """Get path to Steam StatsExport directory (for UserStats .bin files)."""
     steam_path = getSteamPath()
     return os.path.join(steam_path, 'config', 'StatsExport')
 
 
 def create_message(message_code: str, fallback: str, **params) -> dict[str, Any]:
-    """
-    Create a localized message response.
-
-    Args:
-        message_code: The i18n key for the message (e.g., 'backend.manifestAlreadyExists')
-        fallback: Fallback English text for backward compatibility
-        **params: Parameters for message interpolation
-
-    Returns:
-        Dictionary with message_code, message_params, and details (fallback)
-    """
     return {
         'message_code': message_code,
         'message_params': params,
-        'details': fallback  # Fallback for backward compatibility
+        'details': fallback
     }
 
 
@@ -212,14 +197,25 @@ def _manilua_headers(api_key: Optional[str], accept: str = "application/octet-st
 
 
 
-def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]:
-    """
-    Extract Manilua archive and distribute files to appropriate directories.
+def extract_user_dlc_lines(content: str, main_appid: str) -> list[str]:
+    lines = content.split('\n')
+    dlc_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith('--'):
+            continue
+        if 'addappid(' in line:
+            match = re.search(r'addappid\((\d+)', line)
+            if match:
+                id_found = match.group(1)
+                if id_found != main_appid:
+                    if '--' in line:
+                        dlc_lines.append(line)
+        if 'addtoken' in line:
+            dlc_lines.append(line)
+    return dlc_lines
 
-    Returns:
-        Dictionary with 'lua_content' (main .lua file content as string),
-        'installed_files' (list of file paths), and 'success' (bool)
-    """
+def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]:
     result: dict[str, Any] = {
         'success': False,
         'lua_content': None,
@@ -256,14 +252,24 @@ def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]
                         dest_path = os.path.join(stplug_in_dir, base_name)
                         try:
                             decoded = file_content.decode('utf-8')
-                            if not os.path.isfile(dest_path):
-                                with open(dest_path, 'w', encoding='utf-8') as f:
-                                    f.write(decoded)
-                                result['installed_files'].append(dest_path)
-                                logger.log(f"Extracted {file_name} → {dest_path}")
-                            else:
-                                logger.log(f"LUA file {dest_path} already exists, skipping overwrite")
                             lua_files_found.append(decoded)
+                            merged_content = decoded
+
+                            if os.path.isfile(dest_path):
+                                with open(dest_path, 'r', encoding='utf-8') as f:
+                                    existing_content = f.read()
+                                user_dlc_lines = extract_user_dlc_lines(existing_content, appid)
+                                for dlc_line in user_dlc_lines:
+                                    if dlc_line not in merged_content:
+                                        merged_content += '\n' + dlc_line
+                                logger.log(f"Merged {len(user_dlc_lines)} user DLC lines into new content")
+                            else:
+                                logger.log(f"Writing new file {dest_path}")
+
+                            with open(dest_path, 'w', encoding='utf-8') as f:
+                                f.write(merged_content)
+                            result['installed_files'].append(dest_path)
+                            logger.log(f"Extracted {file_name} → {dest_path}")
                         except UnicodeDecodeError:
                             if not os.path.isfile(dest_path):
                                 with open(dest_path, 'wb') as f:
@@ -271,7 +277,7 @@ def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]
                                 result['installed_files'].append(dest_path)
                                 logger.log(f"Extracted {file_name} → {dest_path}")
                             else:
-                                logger.log(f"LUA file {dest_path} already exists, skipping overwrite")
+                                logger.log(f"LUA file {dest_path} already exists, skipping binary overwrite")
                             lua_files_found.append(file_content.decode('utf-8', errors='replace'))
 
                     elif file_name_lower.endswith('.manifest'):
@@ -390,7 +396,6 @@ def _build_manifest_urls(appid: str, extension: str) -> list[str]:
 
 
 def _get_from_cache(key: str) -> Optional[Any]:
-    """Get value from cache if not expired."""
     if key in _cache:
         value, expiry_time = _cache[key]
         if time.time() < expiry_time:
@@ -401,15 +406,9 @@ def _get_from_cache(key: str) -> Optional[Any]:
 
 
 def _set_to_cache(key: str, value: Any) -> None:
-    """Store value in cache with expiry time."""
     _cache[key] = (value, time.time() + CACHE_EXPIRY_SECONDS)
 
-
 def _download_text(urls: list[str]) -> Optional[str]:
-    """
-    Download text content from public mirrors (GitHub, jsdmirror).
-    Uses HTTPClient WITHOUT Steam verification headers since public mirrors don't need them.
-    """
     client = get_global_client()
 
     for url in urls:
@@ -417,11 +416,11 @@ def _download_text(urls: list[str]) -> Optional[str]:
             result = client.get_text(
                 url,
                 accept="text/plain, application/json, */*",
-                use_steam_verification=False  # Public mirrors don't need Steam verification
+                use_steam_verification=False
             )
 
             if result['success']:
-                return result['data']  # Already a string from get_text()
+                return result['data']
 
             status_code = result.get('status_code')
             if status_code:
@@ -434,8 +433,41 @@ def _download_text(urls: list[str]) -> Optional[str]:
     return None
 
 
+def download_lua_manifest_text(appid: str, mirror: str = 'default') -> Optional[str]:
+    if mirror == 'manilua':
+        if not _manilua_api_key:
+            return None
+        try:
+            client = get_global_client()
+            result = client.get_binary(
+                f"{MANILUA_API_BASE}/game/{appid}",
+                params={'appid': appid},
+                auth_token=_manilua_api_key
+            )
+
+            if not result['success']:
+                return None
+
+            content_type = (result.get("content_type") or "").lower()
+            raw = result['data']
+
+            if content_type.startswith("application/zip") or raw[:2] == b"PK":
+                with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                    for file_name in archive.namelist():
+                        if file_name.endswith('.lua'):
+                            with archive.open(file_name) as f:
+                                decoded = f.read().decode('utf-8')
+                                return decoded
+                    return None
+            else:
+                text = raw.decode("utf-8")
+                return text if text.strip() else None
+        except Exception:
+            return None
+    else:
+        return _download_text(_build_manifest_urls(appid, '.lua'))
+
 def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
-    """Download lua manifest with caching."""
     mirror_key = mirror or 'default'
     cache_key = f'lua_{mirror_key}_{appid}'
     cached = _get_from_cache(cache_key)
@@ -456,7 +488,6 @@ def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
 
 
 def download_json_manifest(appid: str) -> Optional[dict[str, Any]]:
-    """Download JSON manifest with caching."""
     cache_key = f'json_{appid}'
     cached = _get_from_cache(cache_key)
     if cached is not None:
@@ -476,11 +507,6 @@ def download_json_manifest(appid: str) -> Optional[dict[str, Any]]:
 
 
 def build_dlc_lua_from_manifest(manifest: dict[str, Any], dlc_appid: str) -> Optional[str]:
-    """
-    Build DLC lua content from JSON manifest.
-    Returns content with both addappid and setManifestid (if available).
-    The caller will extract setManifestid lines as needed.
-    """
     depot = manifest.get('depot')
     if not isinstance(depot, dict):
         return None
@@ -528,28 +554,22 @@ def _ensure_directory(path: str) -> None:
 
 
 def get_manifest_path(appid: str) -> str:
-    """Get path to manifest file for given appid."""
     steam_path = getSteamPath()
     plugin_dir = os.path.join(steam_path, 'config', 'stplug-in')
     return os.path.join(plugin_dir, f'{appid}.lua')
 
 
 def clean_lua_content(content: str) -> str:
-    """
-    Clean lua content by:
-    1. Removing unnecessary comments (e.g., "-- manifest & lua provided by...", "-- via manilua", "-- dlc")
-    2. Removing ALL blank lines (no blank lines at all)
-    """
     lines = content.split('\n')
     cleaned_lines = []
 
     remove_patterns = [
         r'--\s*manifest\s*(&|and)\s*lua\s*provided\s*by',
         r'--\s*via\s+manilua',
-        r'--\s*https?://',  # URLs in comments
+        r'--\s*https?://',
         r'--\s*provided\s+by',
         r'--\s*source:',
-        r'^--\s*dlc\s*$',  # Remove standalone "-- dlc" marker lines
+        r'^--\s*dlc\s*$',
     ]
 
     for line in lines:
@@ -590,17 +610,6 @@ def write_lua_file(appid: str, content: str) -> str:
 
 
 def remove_dlc_entries_from_content(content: str, dlcs_to_remove: set[str], main_appid: str) -> str:
-    """
-    Remove ALL DLC entries from lua content.
-
-    Removes:
-    1. All addappid() calls that have comments (these are DLC)
-    2. Associated addtoken() calls for removed DLC
-
-    Preserves:
-    1. Main game appid
-    2. Depot IDs (addappid with keys but NO comments - these are depot IDs of the base game)
-    """
     lines = content.split('\n')
     filtered_lines = []
     removed_dlc_ids: set[str] = set()
@@ -611,7 +620,7 @@ def remove_dlc_entries_from_content(content: str, dlcs_to_remove: set[str], main
         if 'addtoken' in line:
             match = re.search(r'addtoken\((\d+)', line)
             if match and match.group(1) in removed_dlc_ids:
-                continue  # Skip addtoken for removed DLC
+                continue
             filtered_lines.append(line)
             continue
 
@@ -713,12 +722,6 @@ def fetch_dlc_decryption_keys(dlc_ids: list[str], main_appid: str, main_game_jso
     return keys
 
 def extract_dlc_metadata_from_lua(content: str, main_appid: str) -> dict[str, dict[str, Any]]:
-    """
-    Extract DLC metadata from existing Manilua .lua file including comments and tokens.
-    Returns dict mapping dlc_appid -> {name, comment, token, has_key}
-
-    This allows preserving original Manilua data when re-adding DLC.
-    """
     dlc_metadata: dict[str, dict[str, Any]] = {}
     lines = content.split('\n')
     in_dlc_section = False
@@ -752,7 +755,7 @@ def extract_dlc_metadata_from_lua(content: str, main_appid: str) -> dict[str, di
         comment = None
         if has_comment:
             comment_part = line.split('--', 1)[1].strip()
-            comment = comment_part  # Save full comment
+            comment = comment_part
             for prefix in ['DLC:', 'dlc:', 'DLC', 'dlc']:
                 if comment_part.startswith(prefix):
                     comment_part = comment_part[len(prefix):].strip()
@@ -767,7 +770,7 @@ def extract_dlc_metadata_from_lua(content: str, main_appid: str) -> dict[str, di
             'name': name,
             'comment': comment,
             'has_key': has_key,
-            'token': None  # Will be filled in second pass
+            'token': None
         }
 
     for line in lines:
@@ -787,17 +790,6 @@ def extract_dlc_metadata_from_lua(content: str, main_appid: str) -> dict[str, di
 
 
 def parse_dlc_from_lua(content: str, main_appid: str) -> list[dict[str, Any]]:
-    """
-    Parse DLC entries from existing Manilua .lua file.
-    Returns list of DLC with their appid and name (extracted from comments).
-
-    DLC are identified by:
-    - Having an inline comment (e.g., addappid(123) -- Name)
-    - Appearing after a "-- dlc" section marker
-
-    NOT DLC (depot IDs of base game):
-    - addappid with decryption key but NO comment (e.g., addappid(1643321,0,"key..."))
-    """
     metadata = extract_dlc_metadata_from_lua(content, main_appid)
     dlc_list: list[dict[str, Any]] = []
 
@@ -827,6 +819,7 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
     manilua_dlc_list: list[dict[str, Any]] = []
 
     if mirror == 'manilua' and _manilua_api_key:
+
         user_installed_dlcs = set()
         if os.path.isfile(main_file):
             try:
@@ -835,33 +828,26 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
                     for match in re.finditer(r'addappid\((\d+)', local_content):
                         found_id = match.group(1)
                         if found_id != appid:
-                            user_installed_dlcs.add(found_id)
-                            logger.log(f"prochital user installed DLC: {found_id}")
+                            logger.log(f"Found addappid in file: {found_id}")
+
                     local_dlc_list = parse_dlc_from_lua(local_content, appid)
                     local_dlc_appids = [d['appid'] for d in local_dlc_list]
-                    logger.log(f"DLC list from local file before download for {appid}: {local_dlc_appids} ({len(local_dlc_appids)} items)")
+                    user_installed_dlcs = set(local_dlc_appids)
+                    logger.log(f"DLC list from local file for {appid} (user installed): {local_dlc_appids} ({len(local_dlc_appids)} items)")
             except Exception as e:
                 logger.log(f"Error reading {main_file}: {e}")
 
-        logger.log(f"Fetching fresh DLC list from Manilua for {appid}")
-        manilua_content = download_lua_manifest(appid, 'manilua')
-        logger.log(f"Skachal  {appid}")
+        logger.log(f"Fetching DLC list text from Manilua API for {appid}")
+        manilua_content = download_lua_manifest_text(appid, 'manilua')
         if manilua_content:
+            logger.log(f"Downloaded Manilua manifest text for {appid} ({len(manilua_content)} chars)")
             manilua_dlc_list = parse_dlc_from_lua(manilua_content, appid)
             logger.log(f"Found {len(manilua_dlc_list)} DLC in Manilua manifest")
-
-            installed_dlc_ids.update(user_installed_dlcs)
         else:
-            logger.log(f"Failed to fetch Manilua manifest for {appid}, falling back to local file")
-            if os.path.isfile(main_file):
-                try:
-                    with open(main_file, 'r', encoding='utf-8') as f:
-                        local_content = f.read()
-                        manilua_dlc_list = parse_dlc_from_lua(local_content, appid)
-                        logger.log(f"Fallback: found {len(manilua_dlc_list)} DLC in local file")
-                        installed_dlc_ids.update(user_installed_dlcs)
-                except Exception as e:
-                    logger.log(f"Error reading local file for fallback: {e}")
+            logger.log(f"Failed to download Manilua manifest text for {appid}, using local file as fallback")
+            manilua_dlc_list = parse_dlc_from_lua(local_content, appid) if 'local_content' in locals() else []
+
+        installed_dlc_ids.update(user_installed_dlcs)
     elif os.path.isfile(main_file):
         try:
             with open(main_file, 'r', encoding='utf-8') as f:
@@ -889,7 +875,7 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
         if main_game_json:
             logger.log(f"Loaded main game JSON manifest for {appid}")
 
-    dlc_items: list[tuple[str, str]] = []  # (dlc_appid, name)
+    dlc_items: list[tuple[str, str]] = []
     for item in related:
         if not isinstance(item, dict):
             continue
@@ -963,11 +949,6 @@ def extract_appid(raw: str) -> Optional[str]:
 
 
 def process_lua_content(lua_content: str, json_data: dict[str, Any]) -> str:
-    """
-    Process lua content per SteamTools logic:
-    1. Remove all setManifestid lines
-    2. Add decryptionkey to addappid calls from JSON data
-    """
     import re
 
     lines = lua_content.split('\n')
@@ -1010,14 +991,6 @@ def process_lua_content(lua_content: str, json_data: dict[str, Any]) -> str:
     return '\n'.join(filtered_lines)
 
 def install_manifest_for_app(appid: str) -> dict[str, Any]:
-    """
-    Install base game manifest per SteamTools logic:
-    1. Check if file already exists - if yes, skip download/save but still return DLC list
-    2. If not exists: Download .lua and .json for the game
-    3. Process lua content (remove setManifestid, add decryptionkey)
-    4. Save processed content
-    5. Return DLC list for selection (always fetch fresh list from API)
-    """
     result: dict[str, Any] = {'success': False, 'dlc': [], 'appid': appid}
 
     existing_file = get_manifest_path(appid)
@@ -1076,13 +1049,6 @@ class Backend:
 
     @staticmethod
     def delete_lua(id: str):
-        """
-        Delete all files associated with a game from Manilua archives.
-        Removes files from:
-        - Steam/config/stplug-in/ (.lua files)
-        - Steam/config/depotcache/ (.manifest files for all depot IDs found in .lua)
-        - Steam/config/StatsExport/ (UserStats .bin files)
-        """
         removed_files = []
         errors = []
 
@@ -1126,7 +1092,7 @@ class Backend:
                             except Exception as exc:
                                 errors.append(f"Failed to remove {manifest_file}: {exc}")
                                 logger.log(errors[-1])
-                            break  # Stop checking other depot IDs for this file
+                            break
             except Exception as exc:
                 errors.append(f"Failed to scan depotcache directory: {exc}")
                 logger.log(errors[-1])
@@ -1148,7 +1114,7 @@ class Backend:
                             except Exception as exc:
                                 errors.append(f"Failed to remove {bin_file}: {exc}")
                                 logger.log(errors[-1])
-                            break  # Stop checking other depot IDs for this file
+                            break
             except Exception as exc:
                 errors.append(f"Failed to scan StatsExport directory: {exc}")
                 logger.log(errors[-1])
@@ -1185,13 +1151,11 @@ class Backend:
 
     @staticmethod
     def has_manilua_api_key(payload: Any = None, **kwargs) -> dict[str, Any]:
-        """Return whether a Manilua API key is configured."""
         _load_manilua_api_key()
         return {'success': bool(_manilua_api_key), 'configured': bool(_manilua_api_key)}
 
     @staticmethod
     def get_manilua_api_status(payload: Any = None, **kwargs) -> dict[str, Any]:
-        """Return detailed information about the configured Manilua API key (no validation, like original manilua-plugin v3.2.0)."""
         try:
             _load_manilua_api_key()
 
@@ -1210,7 +1174,7 @@ class Backend:
             return {
                 'success': True,
                 'hasKey': True,
-                'isValid': True,  # Always True if key exists (like original plugin)
+                'isValid': True,
                 'maskedKey': masked,
                 **msg,
             }
@@ -1220,7 +1184,6 @@ class Backend:
 
     @staticmethod
     def set_manilua_api_key(payload: Any = None, **kwargs) -> dict[str, Any]:
-        """Store the Manilua API key without validation (like original manilua-plugin v3.2.0)."""
         try:
             data: dict[str, Any] = {}
             if isinstance(payload, dict):
@@ -1249,10 +1212,6 @@ class Backend:
 
     @staticmethod
     def get_dlc_list(payload: Any = None, **kwargs) -> dict[str, Any]:
-        """
-        Get DLC list without downloading anything.
-        Just return available DLC from API and mark which ones are already installed.
-        """
         data: dict[str, Any] = {}
         if isinstance(payload, dict):
             data.update(payload)
@@ -1271,14 +1230,10 @@ class Backend:
             return {'success': False, **msg, 'dlc': [], 'appid': ''}
 
         mirror = str(data.get('mirror') or 'default').strip() or 'default'
-        main_game_manifest = download_lua_manifest(appid, mirror)
-        if not main_game_manifest:
-            game_info = fetch_game_info(appid)
-            name = game_info.get('name') if game_info else 'Unknown'
-            if mirror == 'manilua':
-                msg = create_message('backend.manifestNotAvailableManilua', f"Manifest for {appid} ({name}) is not available via the Manilua mirror. Please check your API key.", appid=appid, name=name)
-            else:
-                msg = create_message('backend.manifestNotAvailablePublic', f"Manifest for {appid} ({name}) is not available on the public mirrors.", appid=appid, name=name)
+
+        manifest_content = download_lua_manifest_text(appid, mirror)
+        if mirror == 'manilua' and not manifest_content:
+            msg = create_message('backend.manifestNotAvailableManilua', f"Manifest for {appid} is not available via the Manilua mirror. Please check your API key.")
             logger.log(msg['details'])
             return {'success': False, **msg, 'dlc': [], 'appid': appid}
 
@@ -1299,12 +1254,6 @@ class Backend:
 
     @staticmethod
     def install_dlcs(payload: Any = None, **kwargs) -> dict[str, Any]:
-        """
-        Install DLC per SteamTools logic:
-        1) Ensure base .lua file exists (via selected mirror)
-        2) Remove old DLC entries
-        3) Add selected DLC (with keys if found)
-        """
         data: dict[str, Any] = {}
         if isinstance(payload, dict):
             data.update(payload)
@@ -1339,7 +1288,7 @@ class Backend:
         base_game_path = get_manifest_path(appid)
         if not os.path.isfile(base_game_path):
             logger.log(f'Base game manifest not found, downloading for {appid} via mirror={mirror}')
-            lua_content = download_lua_manifest(appid, mirror)  # IMPORTANT: consider mirror
+            lua_content = download_lua_manifest(appid, mirror)
             if not lua_content:
                 if mirror == 'manilua':
                     msg = create_message('backend.manifestNotAvailableManiluaNoName',
@@ -1389,7 +1338,7 @@ class Backend:
         dlc_keys_map = fetch_dlc_decryption_keys(requested, appid, None, mirror)
 
         if not requested:
-            base_content = remove_dlc_entries_from_content(base_content, None, appid)  # None means remove all DLC
+            base_content = remove_dlc_entries_from_content(base_content, None, appid)
         else:
             base_content = remove_dlc_entries_from_content(base_content, set(requested), appid)
         dlc_lines: list[str] = []
