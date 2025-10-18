@@ -41,18 +41,82 @@ except ImportError:
         def error(self, msg: str) -> None:
             self._logger.error(msg)
 
-    logger = _FallbackLogger()
 
-    class Millennium:
-        @staticmethod
-        def steam_path():
-            return os.path.expandvars(r'%PROGRAMFILES(X86)%\Steam')
+def GetPluginDir():
+    current_file = os.path.realpath(__file__)
 
-        @staticmethod
-        def ready():
-            pass
-_MANILUA_KEY_FILE = os.path.join(os.path.expanduser("~"), ".SteamAppInserter", "manilua_api_key.txt")
-_manilua_api_key: Optional[str] = None
+    if current_file.endswith('/main.py/main.py') or current_file.endswith('\\main.py\\main.py'):
+        current_file = current_file[:-8]
+    elif current_file.endswith('/main.py') or current_file.endswith('\\main.py'):
+        current_file = current_file[:-8]
+
+    backend_dir = os.path.dirname(current_file)
+    plugin_dir = os.path.dirname(backend_dir)
+
+    return plugin_dir
+
+
+class Plugin:
+    def __init__(self):
+        self.plugin_dir = GetPluginDir()
+        self.backend_path = os.path.join(self.plugin_dir, 'backend', 'api_key.txt')
+        self._api_key: Optional[str] = None
+        self._load_api_key()
+
+    def _load_api_key(self):
+        try:
+            path = self.backend_path
+            if os.path.isfile(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    candidate = f.read().strip()
+                    self._api_key = candidate or None
+                    logger.log(f"Loaded Manilua API key from backend")
+            else:
+                self._api_key = None
+        except Exception as exc:
+            logger.log(f"Failed to load Manilua API key: {exc}")
+            self._api_key = None
+
+    def _save_api_key(self, api_key: Optional[str]):
+        try:
+            _ensure_directory(os.path.dirname(self.backend_path))
+            if api_key:
+                with open(self.backend_path, "w", encoding="utf-8") as f:
+                    f.write(api_key.strip())
+                self._api_key = api_key.strip()
+                purge = [key for key in list(_cache.keys()) if key.startswith('lua_manilua_')]
+                for key in purge:
+                    _cache.pop(key, None)
+            else:
+                if os.path.isfile(self.backend_path):
+                    os.remove(self.backend_path)
+                self._api_key = None
+                purge = [key for key in list(_cache.keys()) if key.startswith('lua_manilua_')]
+                for key in purge:
+                    _cache.pop(key, None)
+        except Exception as exc:
+            logger.error(f"Failed to save Manilua API key: {exc}")
+            raise
+
+    def get_api_key(self) -> Optional[str]:
+        return self._api_key
+
+    def has_api_key(self) -> bool:
+        return self._api_key is not None
+
+    def set_api_key(self, api_key: Optional[str]):
+        self._save_api_key(api_key)
+
+    def _front_end_loaded(self):
+        logger.log('Frontend loaded!')
+
+    def _load(self):
+        logger.log('Backend loaded')
+        Millennium.ready()
+        self._load_api_key()  # Если нужно перезагрузить
+
+    def _unload(self):
+        logger.log('unloading')
 
 try:
     from steam_verification import get_steam_verification, refresh_steam_verification
@@ -64,71 +128,6 @@ except Exception:
 
 
 _cache: dict[str, tuple[Any, float]] = {}
-
-
-def _get_manilua_key_path() -> str:
-    return _MANILUA_KEY_FILE
-
-
-def _load_manilua_api_key() -> None:
-    global _manilua_api_key
-    try:
-        path = _get_manilua_key_path()
-        _ensure_directory(os.path.dirname(path))
-        logger.log(f"Loading Manilua API key from: {path}")
-        if os.path.isfile(path):
-            with open(path, "r", encoding="utf-8") as handle:
-                candidate = handle.read().strip()
-                _manilua_api_key = candidate or None
-                if _manilua_api_key:
-                    logger.log(f"Loaded Manilua API key: {_mask_api_key(_manilua_api_key)}")
-                else:
-                    logger.log("API key file is empty")
-        else:
-            logger.log(f"API key file does not exist: {path}")
-            _manilua_api_key = None
-    except Exception as exc:
-        logger.log(f"Failed to load Manilua API key: {exc}")
-        _manilua_api_key = None
-
-
-def _create_empty_key_file() -> None:
-    try:
-        path = _get_manilua_key_path()
-        _ensure_directory(os.path.dirname(path))
-        if not os.path.isfile(path):
-            with open(path, "w", encoding="utf-8") as handle:
-                handle.write("")
-            logger.log(f"Created empty API key file: {path}")
-    except Exception as exc:
-        logger.log(f"Failed to create empty API key file: {exc}")
-
-
-def _save_manilua_api_key(value: Optional[str]) -> None:
-    global _manilua_api_key
-    path = _get_manilua_key_path()
-    try:
-        if value:
-            _ensure_directory(os.path.dirname(path))
-            with open(path, "w", encoding="utf-8") as handle:
-                handle.write(value.strip())
-            _manilua_api_key = value.strip()
-            purge = [key for key in list(_cache.keys()) if key.startswith('lua_manilua_')]
-            for key in purge:
-                _cache.pop(key, None)
-        else:
-            if os.path.isfile(path):
-                os.remove(path)
-            _manilua_api_key = None
-            purge = [key for key in list(_cache.keys()) if key.startswith('lua_manilua_')]
-            for key in purge:
-                _cache.pop(key, None)
-    except Exception as exc:
-        logger.log(f"Failed to save Manilua API key: {exc}")
-        raise
-
-
-_load_manilua_api_key()
 
 
 def getSteamPath() -> str:
@@ -435,14 +434,15 @@ def _download_text(urls: list[str]) -> Optional[str]:
 
 def download_lua_manifest_text(appid: str, mirror: str = 'default') -> Optional[str]:
     if mirror == 'manilua':
-        if not _manilua_api_key:
+        api_key = get_plugin().get_api_key()
+        if not api_key:
             return None
         try:
             client = get_global_client()
             result = client.get_binary(
                 f"{MANILUA_API_BASE}/game/{appid}",
                 params={'appid': appid},
-                auth_token=_manilua_api_key
+                auth_token=api_key
             )
 
             if not result['success']:
@@ -475,10 +475,11 @@ def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
         logger.log(f"Using cached lua manifest for {appid}")
         return cached
     if mirror_key == 'manilua':
-        if not _manilua_api_key:
+        api_key = get_plugin().get_api_key()
+        if not api_key:
             logger.log("Manilua mirror requested but API key is not configured.")
             return None
-        result = download_lua_manifest_manilua(appid, _manilua_api_key)
+        result = download_lua_manifest_manilua(appid, api_key)
     else:
         result = _download_text(_build_manifest_urls(appid, '.lua'))
 
@@ -818,7 +819,7 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
     installed_dlc_ids = set()
     manilua_dlc_list: list[dict[str, Any]] = []
 
-    if mirror == 'manilua' and _manilua_api_key:
+    if mirror == 'manilua' and get_plugin().get_api_key():
 
         user_installed_dlcs = set()
         if os.path.isfile(main_file):
@@ -1151,15 +1152,14 @@ class Backend:
 
     @staticmethod
     def has_manilua_api_key(payload: Any = None, **kwargs) -> dict[str, Any]:
-        _load_manilua_api_key()
-        return {'success': bool(_manilua_api_key), 'configured': bool(_manilua_api_key)}
+        return {'success': get_plugin().has_api_key(), 'configured': get_plugin().has_api_key()}
 
     @staticmethod
     def get_manilua_api_status(payload: Any = None, **kwargs) -> dict[str, Any]:
         try:
-            _load_manilua_api_key()
+            api_key = get_plugin().get_api_key()
 
-            if not _manilua_api_key:
+            if not api_key:
                 msg = create_message('backend.apiKeyNotConfigured', 'No API key configured.')
                 return {
                     'success': True,
@@ -1168,7 +1168,7 @@ class Backend:
                     **msg,
                 }
 
-            masked = _mask_api_key(_manilua_api_key)
+            masked = _mask_api_key(api_key)
             msg = create_message('backend.apiKeyConfigured', 'API key is configured.')
 
             return {
@@ -1201,7 +1201,7 @@ class Backend:
             if not candidate.startswith(MANILUA_API_KEY_PREFIX):
                 msg = create_message('backend.apiKeyMustStartWith', f'API key must start with {MANILUA_API_KEY_PREFIX}.', prefix=MANILUA_API_KEY_PREFIX)
                 return {'success': False, **msg}
-            _save_manilua_api_key(candidate)
+            get_plugin().set_api_key(candidate)
             logger.log('Manilua API key stored.')
 
             msg = create_message('backend.apiKeySaved', 'API key saved successfully.')
@@ -1280,7 +1280,7 @@ class Backend:
             logger.log(msg['details'])
             return {'success': False, **msg, 'installed': [], 'failed': requested}
 
-        if mirror == 'manilua' and not _manilua_api_key:
+        if mirror == 'manilua' and not get_plugin().get_api_key():
             msg = create_message('backend.maniluaRequiresApiKey', 'The Manilua mirror requires a valid API key.')
             logger.log(msg['details'])
             return {'success': False, **msg, 'installed': [], 'failed': requested}
@@ -1376,13 +1376,12 @@ class Backend:
         return {'success': True, **msg, 'installed': installed_ids, 'failed': []}
 
 
-class Plugin:
-    def _front_end_loaded(self):
-        logger.log('Frontend loaded!')
+_plugin_instance = None
 
-    def _load(self):
-        logger.log('Backend loaded')
-        Millennium.ready()
+def get_plugin():
+    global _plugin_instance
+    if _plugin_instance is None:
+        _plugin_instance = Plugin()
+    return _plugin_instance
 
-    def _unload(self):
-        logger.log('unloading')
+plugin = get_plugin()
