@@ -2,6 +2,7 @@ const en = {
   common: {
     ok: "OK",
     cancel: "Cancel",
+    removeAllDlc: "Remove all DLC",
     remove: "Remove",
     errorWithMessage: "Error: {message}",
   },

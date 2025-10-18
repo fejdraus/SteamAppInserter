@@ -5,6 +5,11 @@ import time
 from typing import Any, Dict, Optional
 
 try:
+    from config import VERSION
+except ImportError:
+    VERSION = "3.2.0"
+
+try:
     import Millennium  # type: ignore
 except ImportError:
     class Millennium:  # type: ignore
@@ -148,7 +153,7 @@ class SteamVerification:
             'X-Process-Hash': self._get_process_hash(),
             'X-Memory-Proof': self._get_memory_proof(),
             'X-Plugin-Timestamp': timestamp,
-            'User-Agent': f'manilua-plugin/{self.millennium_version or "3.1.1"} (Millennium)',
+            'User-Agent': f'manilua-plugin/{VERSION} (Millennium)',
         }
         return headers
 

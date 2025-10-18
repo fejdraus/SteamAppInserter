@@ -2,6 +2,7 @@ const ptBR = {
   common: {
     ok: "OK",
     cancel: "Cancelar",
+    removeAllDlc: "Remover todos os DLC",
     remove: "Remover",
     errorWithMessage: "Erro: {message}",
   },
@@ -113,4 +114,3 @@ const ptBR = {
 };
 
 export default ptBR;
-

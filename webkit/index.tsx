@@ -1,4 +1,3 @@
-// @ts-ignore
 import { ShowMessageBox, callable } from '@steambrew/webkit';
 import { initI18n, t } from './i18n.js';
 
@@ -32,9 +31,10 @@ type ApiStatus = {
     message?: string;
 };
 
+let currentMirror: MirrorId | null = null;
 const getDlcListRpc = callable<[{ appid: string; mirror?: string }], RawBackendResponse>('Backend.get_dlc_list');
 const installDlcsRpc = callable<[{ appid: string; dlcs: string[]; mirror?: string }], RawBackendResponse>('Backend.install_dlcs');
-const deletegame = callable<[{ id: string }], boolean>('Backend.deletelua');
+const deletegame = callable<[{ id: string }], boolean>('Backend.delete_lua');
 const checkPirated = callable<[{ id: string }], boolean>('Backend.checkpirated');
 const restartt = callable<[], boolean>('Backend.restart');
 const setManiluaApiKeyRpc = callable<[{ api_key: string }], RawBackendResponse>('Backend.set_manilua_api_key');
@@ -144,7 +144,6 @@ const createDialogShell = (title: string, subtitle?: string) => {
     };
 
     overlay.addEventListener('click', () => {
-        // Prevent accidental background clicks from doing anything.
     });
 
     requestAnimationFrame(() => {
@@ -279,12 +278,10 @@ const localizeBackendMessage = (response: any): string => {
     const messageCode = response.message_code;
     const messageParams = response.message_params;
 
-    // If we have a message code, use it for localization
     if (typeof messageCode === 'string' && messageCode.length > 0) {
         return t(messageCode, messageParams || {});
     }
 
-    // Fallback to details/message/error
     return toNonEmptyString(response.details || response.message || response.error, '');
 };
 
@@ -434,20 +431,32 @@ const extractBooleanFromResponse = (raw: RawBackendResponse, fallback = false): 
     }
 
     if (typeof raw === 'string') {
-        const trimmed = raw.trim().toLowerCase();
-        if (trimmed === 'true') return true;
-        if (trimmed === 'false') return false;
-        return fallback;
+        const trimmed = raw.trim();
+        try {
+            if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+                raw = JSON.parse(trimmed) as RawBackendResponse;
+            } else if (trimmed.toLowerCase() === 'true') {
+                return true;
+            } else if (trimmed.toLowerCase() === 'false') {
+                return false;
+            } else {
+                return fallback;
+            }
+        } catch {
+            return fallback;
+        }
     }
 
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
         const obj = raw as Record<string, unknown>;
-        if (typeof obj.configured === 'boolean') {
-            return obj.configured;
-        }
-        if (typeof obj.success === 'boolean') {
-            return obj.success;
-        }
+        if (typeof obj.configured === 'boolean') return obj.configured;
+        if (typeof obj.success === 'boolean') return obj.success;
+        if (typeof obj.isValid === 'boolean') return obj.isValid;
+        if (typeof obj.hasKey === 'boolean') return obj.hasKey;
+    }
+
+    if (typeof raw === 'boolean') {
+        return raw;
     }
 
     return fallback;
@@ -468,22 +477,30 @@ const maskApiKey = (value: string): string => {
 };
 
 const getApiStatus = async (force = false): Promise<ApiStatus> => {
-    if (force) {
-        apiState.checked = false;
-    }
-
-    if (apiState.checked) {
-        return { ...apiState };
-    }
+    if (force) apiState.checked = false;
+    if (apiState.checked) return { ...apiState };
 
     try {
         const raw = await getManiluaApiStatusRpc();
-        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-            const obj = raw as Record<string, unknown>;
-            apiState.hasKey = Boolean(obj.hasKey);
-            apiState.isValid = obj.isValid !== false;
-            apiState.maskedKey = typeof obj.maskedKey === 'string' ? obj.maskedKey : '';
-            apiState.message = typeof obj.message === 'string' ? obj.message : undefined;
+        let data: unknown = raw;
+        if (typeof raw === 'string') {
+            const t = raw.trim();
+            if (t.startsWith('{') && t.endsWith('}')) {
+                try { data = JSON.parse(t); } catch { /* игнор, пойдём в fallback */ }
+            }
+        }
+
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+            const obj = data as Record<string, unknown>;
+            apiState.hasKey = obj.hasOwnProperty('hasKey')
+                ? Boolean((obj as any).hasKey)
+                : extractBooleanFromResponse(raw, false);
+            apiState.isValid = obj.hasOwnProperty('isValid')
+                ? (obj as any).isValid !== false
+                : apiState.hasKey;
+            apiState.maskedKey = typeof obj.maskedKey === 'string' ? (obj.maskedKey as string) : '';
+            const msg = (obj as any).message ?? (obj as any).details;
+            apiState.message = typeof msg === 'string' ? msg : undefined;
         } else {
             const hasKey = extractBooleanFromResponse(raw, false);
             apiState.hasKey = hasKey;
@@ -497,7 +514,6 @@ const getApiStatus = async (force = false): Promise<ApiStatus> => {
         apiState.maskedKey = '';
         apiState.message = error instanceof Error ? error.message : String(error);
     }
-
     apiState.checked = true;
     return { ...apiState };
 };
@@ -664,16 +680,10 @@ const ensureManiluaApiKey = async (): Promise<boolean> => {
     return true;
 };
 
-const showMirrorSelectionModal = async (): Promise<MirrorId | null> => {
-    if (!document?.body) {
-        return 'default';
-    }
+const showMirrorSelectionModal = async (initial: MirrorId = (currentMirror ?? 'default')): Promise<MirrorId | null> => {
+    if (!document?.body) return initial;
 
-    const disabledMirrors = new Set<MirrorId>(['manilua']);
-    const defaultMirror =
-        MIRROR_OPTIONS.find((option) => !disabledMirrors.has(option.id))?.id ??
-        (MIRROR_OPTIONS[0]?.id ?? 'default');
-
+    const disabledMirrors = new Set<MirrorId>([]);
     return await new Promise<MirrorId | null>((resolve) => {
         const { dialog, content, actions, close } = createDialogShell(t('mirrors.title'));
         const list = document.createElement('div');
@@ -682,7 +692,7 @@ const showMirrorSelectionModal = async (): Promise<MirrorId | null> => {
         list.style.gap = '6px';
         list.style.marginBottom = '12px';
 
-        let selected: MirrorId = defaultMirror;
+        let selected: MirrorId = initial;
 
         MIRROR_OPTIONS.forEach((option) => {
             const isDisabled = disabledMirrors.has(option.id);
@@ -694,9 +704,7 @@ const showMirrorSelectionModal = async (): Promise<MirrorId | null> => {
             row.style.border = '1px solid rgba(255, 255, 255, 0.1)';
             row.style.borderRadius = '4px';
             row.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
-            if (isDisabled) {
-                row.style.opacity = '0.6';
-            }
+            if (isDisabled) row.style.opacity = '0.6';
 
             const radio = document.createElement('input');
             radio.type = 'radio';
@@ -704,21 +712,14 @@ const showMirrorSelectionModal = async (): Promise<MirrorId | null> => {
             radio.value = option.id;
             radio.checked = option.id === selected;
             radio.disabled = isDisabled;
-            if (!isDisabled) {
-                radio.addEventListener('change', () => {
-                    selected = option.id;
-                });
-            }
+            if (!isDisabled) radio.addEventListener('change', () => (selected = option.id));
 
             const label = document.createElement('div');
             label.textContent = t(option.labelKey);
             label.style.flex = '1';
 
-            const badgeText = isDisabled
-                ? t('mirrors.maniluaDisabled')
-                : option.requiresApiKey
-                ? t('auth.title')
-                : '';
+            const badgeText = isDisabled ? t('mirrors.maniluaDisabled')
+                : option.requiresApiKey ? t('auth.title') : '';
 
             row.appendChild(radio);
             row.appendChild(label);
@@ -731,9 +732,7 @@ const showMirrorSelectionModal = async (): Promise<MirrorId | null> => {
             }
 
             row.addEventListener('click', () => {
-                if (isDisabled) {
-                    return;
-                }
+                if (isDisabled) return;
                 radio.checked = true;
                 selected = option.id;
             });
@@ -749,64 +748,41 @@ const showMirrorSelectionModal = async (): Promise<MirrorId | null> => {
 
         let settled = false;
         const finish = (value: MirrorId | null) => {
-            if (settled) {
-                return;
-            }
+            if (settled) return;
             settled = true;
             close();
             resolve(value);
         };
 
-        cancelButton.onclick = (event) => {
-            event.preventDefault();
-            finish(null);
-        };
+        cancelButton.onclick = (e) => { e.preventDefault(); finish(null); };
 
-        confirmButton.onclick = async (event) => {
-            event.preventDefault();
-            const selectedOption = MIRROR_OPTIONS.find((option) => option.id === selected);
-            if (!selectedOption) {
-                return;
-            }
-
-            if (disabledMirrors.has(selectedOption.id)) {
+        confirmButton.onclick = async (e) => {
+            e.preventDefault();
+            const picked = MIRROR_OPTIONS.find(o => o.id === selected);
+            if (!picked) return;
+            if (disabledMirrors.has(picked.id)) {
                 await presentMessage(t('mirrors.title'), t('mirrors.maniluaDisabled'));
-                cancelButton.disabled = false;
-                confirmButton.disabled = false;
                 return;
             }
-
-            cancelButton.disabled = true;
-            confirmButton.disabled = true;
-
-            if (selectedOption.requiresApiKey) {
+            if (picked.requiresApiKey) {
                 const ok = await ensureManiluaApiKey();
-                if (!ok) {
-                    cancelButton.disabled = false;
-                    confirmButton.disabled = false;
-                    return;
-                }
+                if (!ok) return;
             }
-
-            finish(selectedOption.id);
+            currentMirror = selected; // запоминаем только для предвыбора
+            finish(selected);
         };
 
         actions.appendChild(cancelButton);
         actions.appendChild(confirmButton);
 
-        const handleKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                finish(null);
-            }
-        };
-
-        dialog.addEventListener('keydown', handleKey);
+        dialog.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') { event.preventDefault(); finish(null); }
+        });
     });
 };
 
-const ensureMirrorSelection = async (_force = false): Promise<MirrorId | null> => {
-    return await showMirrorSelectionModal();
+const ensureMirrorSelection = async (): Promise<MirrorId | null> => {
+    return await showMirrorSelectionModal(currentMirror ?? 'default');
 };
 
 const normalizeDlcEntry = (entry: unknown): DlcEntry | null => {
@@ -894,7 +870,7 @@ const normalizeInstallDlcsResult = (raw: RawBackendResponse): BackendInstallDlcs
     return { success: false, details: undefined, installed: [], failed: [] };
 };
 
-const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: MirrorId): Promise<boolean> => {
+const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: MirrorId, isEditMode: boolean = false): Promise<boolean> => {
     const normalized = dlcList.map(normalizeDlcEntry).filter((item): item is DlcEntry => item !== null);
     if (!normalized.length || !document.body) return false;
 
@@ -978,7 +954,7 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             const parts: string[] = [];
             if (entry.alreadyInstalled) {
                 parts.push(t('dialogs.selectDlc.alreadyAdded'));
-                checkbox.checked = true;
+                checkbox.checked = isEditMode || false;
             }
             secondary.textContent = parts.join(' - ');
             textContainer.appendChild(mainLine);
@@ -994,13 +970,11 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
                 updateMasterState();
             });
 
-            // Skip adding a divider after the last item to avoid double borders with the list container.
             if (index === normalized.length - 1) {
                 label.style.borderBottom = 'none';
             }
         });
 
-        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
         const confirmButton = createDialogButton(t('dialogs.selectDlc.confirm'), 'primary');
 
         let settled = false;
@@ -1013,7 +987,6 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
 
         const setDisabled = (state: boolean) => {
             confirmButton.disabled = state;
-            cancelButton.disabled = state;
             if (state) {
                 dialog.setAttribute('aria-busy', 'true');
             } else {
@@ -1021,13 +994,8 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             }
         };
 
-        cancelButton.addEventListener('click', () => {
-            finish(false);
-        });
-
         confirmButton.addEventListener('click', async () => {
             const selected = dlcCheckboxes.filter((input) => input.checked).map((input) => input.value);
-
             setDisabled(true);
             const progress = showProgressDialog('preparing');
             try {
@@ -1054,7 +1022,6 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             }
         });
 
-        actions.appendChild(cancelButton);
         actions.appendChild(confirmButton);
 
         const handleKey = (event: KeyboardEvent) => {
@@ -1104,7 +1071,6 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): (
             lastCall = now;
             func(...args);
         } else {
-            // Schedule a delayed call if not already scheduled
             if (!timeoutId) {
                 timeoutId = setTimeout(() => {
                     lastCall = Date.now();
@@ -1116,7 +1082,6 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): (
     };
 };
 
-// Constants
 const ADD_BTN_ID = "add-app-to-library-btn";
 const REMOVE_BTN_ID = "remove-app-from-library-btn";
 const CONTAINER_SELECTOR = ".apphub_OtherSiteInfo";
@@ -1176,14 +1141,32 @@ const handleDlcInstallation = async (
     appId: string,
     dlcList: DlcEntry[],
     onRefreshButtons: () => Promise<void>,
-    mirror: MirrorId
+    mirror: MirrorId,
+    isPirated: boolean
 ): Promise<void> => {
-    const wasInstalled = await showDlcSelection(appId, dlcList, mirror);
+    const isEditMode = isPirated;
+    const wasInstalled = await showDlcSelection(appId, dlcList, mirror, isEditMode);
     if (wasInstalled) {
         await promptSteamRestart(t('messages.changesApplied'), onRefreshButtons);
     } else {
-        // Cancel was clicked, just refresh buttons
-        await onRefreshButtons();
+        const progress = showProgressDialog('removing');
+        try {
+            progress.setStatus('removing');
+            const responseRaw = await installDlcsRpc({ appid: appId, dlcs: [], mirror });
+            const response = normalizeInstallDlcsResult(responseRaw);
+
+            if (response.success) {
+                progress.close('success', 300);
+                await wait(300);
+                await onRefreshButtons();
+            } else {
+                progress.close('failure', 1200);
+                await onRefreshButtons();
+            }
+        } catch (error) {
+            progress.close('failure', 1200);
+            await onRefreshButtons();
+        }
     }
 };
 
@@ -1353,8 +1336,7 @@ export default async function WebkitMain() {
                     return;
                 }
 
-                const forceMirrorSelection = e.altKey || e.shiftKey;
-                const mirror = await ensureMirrorSelection(forceMirrorSelection);
+                const mirror = await ensureMirrorSelection();
                 if (!mirror) {
                     return;
                 }
@@ -1364,12 +1346,10 @@ export default async function WebkitMain() {
                 addBtn.innerHTML = buttonLabel('LOADING');
 
                 try {
-                    // Get DLC list without downloading
                     const rawResult = await getDlcListRpc({ appid: appId, mirror });
                     const dlcResult = normalizeInstallResult(rawResult);
 
                     if (!dlcResult.success) {
-                        // Failed to fetch DLC list
                         await presentMessage(
                             t('alerts.unableGetDlcTitle'),
                             dlcResult.details ?? t('errors.failedFetchInfo')
@@ -1378,15 +1358,11 @@ export default async function WebkitMain() {
                         return;
                     }
 
-                    // Success - check if game has DLC
                     if (dlcResult.dlc && dlcResult.dlc.length) {
-                        // Game has DLC - show selection dialog
-                        await handleDlcInstallation(appId, dlcResult.dlc, insertButtons, mirror);
+                        await handleDlcInstallation(appId, dlcResult.dlc, insertButtons, mirror, isPirated);
                     } else if (!isPirated) {
-                        // No DLC and game not installed - offer base game installation
                         await handleBaseGameInstallation(appId, addBtn, isPirated, insertButtons, mirror);
                     } else {
-                        // No DLC and game already installed - show message
         await presentMessage(
             t('alerts.noDlcTitle'),
             t('messages.noDlcDetails')
@@ -1417,7 +1393,6 @@ export default async function WebkitMain() {
         insertButtons();
     }
 
-    // Throttle MutationObserver callback to prevent excessive calls
     const throttledInsertCheck = throttle(() => {
         const appId = getAppId();
         if (appId && !document.getElementById(ADD_BTN_ID) && !document.getElementById(REMOVE_BTN_ID)) {
