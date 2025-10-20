@@ -236,6 +236,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **[Millennium](https://steambrew.app/)** - Plugin framework
 - **[SteamTools](https://www.steamtools.net/)** - Game unlocking engine
 - **[ManifestHub](https://github.com/SteamAutoCracks/ManifestHub)** - Public manifest repository
+- **[Manilua](https://github.com/piracybound)** - Public (with free registration) manifest repository
 
 ---
 
