@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -165,11 +165,13 @@ This plugin is part of a three-component system:
 The plugin supports **two sources** for downloading manifests:
 
 #### Public Mirrors (Default)
+
 - Primary: `https://raw.githubusercontent.com/SteamAutoCracks/ManifestHub/`
 - Fallback: `https://cdn.jsdmirror.com/gh/SteamAutoCracks/ManifestHub/`
 - **No authentication required**
 
 #### Manilua Mirror (Advanced)
+
 - URL: `https://manilua.golde.org/`
 - **Requires API token** for enhanced compatibility
 - Access to private/locked games and extra DLC
