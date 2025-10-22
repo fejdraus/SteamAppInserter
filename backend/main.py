@@ -542,11 +542,42 @@ def fetch_game_info(appid: str) -> Optional[dict[str, Any]]:
     try:
         response = requests.get(url, timeout=HTTP_TIMEOUT)
         if response.status_code != 200:
-            logger.log(f"SteamUI API returned {response.status_code} for {appid}")
+            logger.log(f"Steam API returned {response.status_code} for {appid}")
             return None
-        return response.json()
+        json_data = response.json()
+        if str(appid) not in json_data or not json_data[str(appid)].get('success', False):
+            logger.log(f"Steam API query failed for {appid}")
+            return None
+        app_data = json_data[str(appid)]['data']
+        dlc_list = app_data.get('dlc', [])
+        related_content = []
+
+        if isinstance(dlc_list, list) and dlc_list:
+            dlc_ids = [str(dlc_id) for dlc_id in dlc_list if isinstance(dlc_id, (int, str))]
+            # Fetch DLC names individually
+            for dlc_id in dlc_ids:
+                try:
+                    dlc_url = f"https://store.steampowered.com/api/appdetails?appids={dlc_id}&cc=en"
+                    dlc_response = requests.get(dlc_url, timeout=HTTP_TIMEOUT)
+                    if dlc_response.status_code == 200:
+                        dlc_json = dlc_response.json()
+                        if dlc_id in dlc_json and dlc_json[dlc_id].get('success', False):
+                            name = dlc_json[dlc_id]['data'].get('name', f'DLC {dlc_id}')
+                            related_content.append({'appid': dlc_id, 'name': name, 'type': 'dlc'})
+                        else:
+                            related_content.append({'appid': dlc_id, 'name': f'DLC {dlc_id}', 'type': 'dlc'})
+                    else:
+                        related_content.append({'appid': dlc_id, 'name': f'DLC {dlc_id}', 'type': 'dlc'})
+                except Exception as exc:
+                    logger.warn(f"Error fetching name for DLC {dlc_id}: {exc}")
+                    related_content.append({'appid': dlc_id, 'name': f'DLC {dlc_id}', 'type': 'dlc'})
+        return {
+            'related_content': related_content,
+            'type': app_data.get('type', ''),
+            'name': app_data.get('name', '')
+        }
     except Exception as exc:
-        logger.log(f"SteamUI API error for {appid}: {exc}")
+        logger.log(f"Steam API error for {appid}: {exc}")
         return None
 
 

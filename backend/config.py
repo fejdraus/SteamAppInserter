@@ -23,9 +23,10 @@ CACHE_EXPIRY_SECONDS = 300  # 5 minutes
 MANIFEST_URLS = (
     "https://raw.githubusercontent.com/SteamAutoCracks/ManifestHub/{appid}/{appid}{extension}",
     "https://cdn.jsdmirror.com/gh/SteamAutoCracks/ManifestHub@{appid}/{appid}{extension}",
+    "http://api.perondepot.xyz/get_manifest?appid={appid}",
 )
 
-STEAMUI_APPINFO = "https://www.steamui.com/api/get_app_name.php?appid={appid}&no_cache=1"
+STEAMUI_APPINFO = "https://store.steampowered.com/api/appdetails?appids={appid}&cc=en"
 
 # User Agent (fallback when Steam verification is not available)
 USER_AGENT = f'manilua-plugin/{VERSION} (Millennium)'

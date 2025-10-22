@@ -235,6 +235,8 @@ const presentConfirmation = async ({
         confirmButton.addEventListener('click', () => finish(true));
 
         actions.appendChild(cancelButton);
+        cancelButton.addEventListener('click', () => finish(false));
+
         actions.appendChild(confirmButton);
 
         const handleKey = (event: KeyboardEvent) => {
@@ -971,6 +973,7 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             }
         });
 
+        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
         const confirmButton = createDialogButton(t('dialogs.selectDlc.confirm'), 'primary');
 
         let settled = false;
@@ -1018,6 +1021,9 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             }
         });
 
+        cancelButton.addEventListener('click', () => finish(false));
+
+        actions.appendChild(cancelButton);
         actions.appendChild(confirmButton);
 
         const handleKey = (event: KeyboardEvent) => {
@@ -1145,24 +1151,8 @@ const handleDlcInstallation = async (
     if (wasInstalled) {
         await promptSteamRestart(t('messages.changesApplied'), onRefreshButtons);
     } else {
-        const progress = showProgressDialog('removing');
-        try {
-            progress.setStatus('removing');
-            const responseRaw = await installDlcsRpc({ appid: appId, dlcs: [], mirror });
-            const response = normalizeInstallDlcsResult(responseRaw);
-
-            if (response.success) {
-                progress.close('success', 300);
-                await wait(300);
-                await onRefreshButtons();
-            } else {
-                progress.close('failure', 1200);
-                await onRefreshButtons();
-            }
-        } catch (error) {
-            progress.close('failure', 1200);
-            await onRefreshButtons();
-        }
+        // Отмена - ничего не делать, просто обновить кнопки
+        await onRefreshButtons();
     }
 };
 
