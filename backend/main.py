@@ -326,7 +326,7 @@ def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]
     return result
 
 
-def download_lua_manifest_manilua(appid: str, api_key: str) -> Optional[str]:
+def download_lua_manifest_manilua(appid: str, api_key: str) -> tuple[Optional[str], Optional[int]]:
     try:
         client = get_global_client()
 
@@ -346,7 +346,7 @@ def download_lua_manifest_manilua(appid: str, api_key: str) -> Optional[str]:
                 logger.log(f"Manilua mirror returned HTTP {status_code} for {appid}")
             else:
                 logger.log(f"Manilua mirror request failed: {result.get('error', 'Unknown error')}")
-            return None
+            return None, status_code
 
         content_type = (result.get("content_type") or "").lower()
         raw = result['data']
@@ -360,25 +360,25 @@ def download_lua_manifest_manilua(appid: str, api_key: str) -> Optional[str]:
                     logger.log("API key authentication failed (from JSON response)")
             except json.JSONDecodeError:
                 logger.log(f"Manilua mirror returned a JSON error for {appid}, but it could not be parsed.")
-            return None
+            return None, None
 
         if content_type.startswith("application/zip") or raw[:2] == b"PK":
             extract_result = _extract_manilua_archive(appid, raw)
             if extract_result['success']:
-                return extract_result['lua_content']
+                return extract_result['lua_content'], None
             else:
                 logger.log(f"Archive extraction failed: {extract_result.get('error', 'Unknown error')}")
-                return None
+                return None, None
 
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError:
             text = raw.decode("utf-8", errors="replace")
 
-        return text if text.strip() else None
+        return text if text.strip() else None, None
     except Exception as exc:
         logger.log(f"Failed to download manifest from Manilua mirror for {appid}: {exc}")
-        return None
+        return None, None
 
 
 def _mask_api_key(value: str) -> str:
@@ -432,11 +432,11 @@ def _download_text(urls: list[str]) -> Optional[str]:
     return None
 
 
-def download_lua_manifest_text(appid: str, mirror: str = 'default') -> Optional[str]:
+def download_lua_manifest_text(appid: str, mirror: str = 'default') -> tuple[Optional[str], Optional[int]]:
     if mirror == 'manilua':
         api_key = get_plugin().get_api_key()
         if not api_key:
-            return None
+            return None, None
         try:
             client = get_global_client()
             result = client.get_binary(
@@ -446,7 +446,7 @@ def download_lua_manifest_text(appid: str, mirror: str = 'default') -> Optional[
             )
 
             if not result['success']:
-                return None
+                return None, result.get('status_code')
 
             content_type = (result.get("content_type") or "").lower()
             raw = result['data']
@@ -457,15 +457,16 @@ def download_lua_manifest_text(appid: str, mirror: str = 'default') -> Optional[
                         if file_name.endswith('.lua'):
                             with archive.open(file_name) as f:
                                 decoded = f.read().decode('utf-8')
-                                return decoded
-                    return None
+                                return decoded, None
+                    return None, None
             else:
                 text = raw.decode("utf-8")
-                return text if text.strip() else None
+                return text if text.strip() else None, None
         except Exception:
-            return None
+            return None, None
     else:
-        return _download_text(_build_manifest_urls(appid, '.lua'))
+        content = _download_text(_build_manifest_urls(appid, '.lua'))
+        return content, None
 
 def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
     mirror_key = mirror or 'default'
@@ -479,7 +480,7 @@ def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
         if not api_key:
             logger.log("Manilua mirror requested but API key is not configured.")
             return None
-        result = download_lua_manifest_manilua(appid, api_key)
+        result, _ = download_lua_manifest_manilua(appid, api_key)
     else:
         result = _download_text(_build_manifest_urls(appid, '.lua'))
 
@@ -870,7 +871,7 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
                 logger.log(f"Error reading {main_file}: {e}")
 
         logger.log(f"Fetching DLC list text from Manilua API for {appid}")
-        manilua_content = download_lua_manifest_text(appid, 'manilua')
+        manilua_content, _ = download_lua_manifest_text(appid, 'manilua')
         if manilua_content:
             logger.log(f"Downloaded Manilua manifest text for {appid} ({len(manilua_content)} chars)")
             manilua_dlc_list = parse_dlc_from_lua(manilua_content, appid)
@@ -1262,9 +1263,24 @@ class Backend:
 
         mirror = str(data.get('mirror') or 'default').strip() or 'default'
 
-        manifest_content = download_lua_manifest_text(appid, mirror)
+        manifest_content, status_code = download_lua_manifest_text(appid, mirror)
         if mirror == 'manilua' and not manifest_content:
-            msg = create_message('backend.manifestNotAvailableManilua', f"Manifest for {appid} is not available via the Manilua mirror. Please check your API key.")
+            info = fetch_game_info(appid)
+            if status_code == 401:
+                msg = create_message('backend.apiKeyRejectedManilua', "API key is rejected by the Manilua mirror. Please check your API key.", appid=appid)
+            elif status_code == 404:
+                if info:
+                    name = info.get('name') or 'Unknown'
+                    msg = create_message('backend.manifestNotFoundManilua', f"Manifest for {name} ({appid}) not found on the Manilua mirror.", appid=appid, name=name)
+                else:
+                    msg = create_message('backend.manifestNotFoundManiluaNoName', f"Manifest for {appid} not found on the Manilua mirror.", appid=appid)
+            else:
+                # Other errors, generic message
+                if info:
+                    name = info.get('name') or 'Unknown'
+                    msg = create_message('backend.manifestNotAvailableManilua', f"Manifest for {name} ({appid}) is not available via the Manilua mirror. Please check your API key.", name=name, appid=appid)
+                else:
+                    msg = create_message('backend.manifestNotAvailableManiluaNoName', f"Manifest for {appid} is not available via the Manilua mirror. Please check your API key.", appid=appid)
             logger.log(msg['details'])
             return {'success': False, **msg, 'dlc': [], 'appid': appid}
 
