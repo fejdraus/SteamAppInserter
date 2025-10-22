@@ -253,3 +253,11 @@ This tool is for educational purposes only. Use at your own risk. The developers
 [Report Bug](https://github.com/fejdraus/SteamAppInserter/issues) • [Request Feature](https://github.com/fejdraus/SteamAppInserter/issues)
 
 </div>
+
+---
+
+<div align="center">
+
+<h1>Glory to Ukraine! Glory to the Heroes! 🇺🇦</h1>
+
+</div>
