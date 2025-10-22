@@ -102,6 +102,7 @@ const uk = {
     manifestNotFoundManilua: "Маніфест для {name} ({appid}) не знайдено на дзеркалі Manilua.",
     manifestNotFoundManiluaNoName: "Маніфест для {appid} не знайдено на дзеркалі Manilua.",
     apiKeyRejectedManilua: "Ключ API відхилено дзеркалом Manilua. Перевірте свій API-ключ.",
+    manifestNotFoundOnMirror: "Маніфест для {name} ({appid}) не знайдено на дзеркалі {source}.",
     couldNotDetermineAppidFromMessage: "Не вдалося визначити AppID з повідомлення.",
     maniluaRequiresApiKey: "Дзеркало Manilua потребує дійсний API-ключ.",
     dlcAdded: "Додано {count} DLC до {target}.",

@@ -127,6 +127,7 @@ except Exception:
         return None
 
 
+MIRROR_NAMES = {'default': 'ManifestHub', 'manilua': 'Manilua'}
 _cache: dict[str, tuple[Any, float]] = {}
 
 
@@ -1215,6 +1216,31 @@ class Backend:
             return {'success': False, 'error': str(exc)}
 
     @staticmethod
+    def check_game_exists(payload: Any = None, **kwargs) -> dict[str, Any]:
+        data: dict[str, Any] = {}
+        if isinstance(payload, dict):
+            data.update(payload)
+        elif payload is not None:
+            data['appid'] = payload
+        if kwargs:
+            data.update(kwargs)
+
+        appid = str(data.get('appid') or '').strip()
+        if not appid:
+            appid = extract_appid(str(payload or ''))
+
+        if not appid:
+            msg = create_message('backend.couldNotDetermineAppid', 'Could not determine AppID.')
+            logger.log(msg['details'])
+            return {'success': False, **msg, 'exists': False}
+
+        info = fetch_game_info(appid)
+        if not info:
+            return {'success': True, 'exists': False}
+
+        return {'success': True, 'exists': True}
+
+    @staticmethod
     def set_manilua_api_key(payload: Any = None, **kwargs) -> dict[str, Any]:
         try:
             data: dict[str, Any] = {}
@@ -1264,28 +1290,15 @@ class Backend:
         mirror = str(data.get('mirror') or 'default').strip() or 'default'
 
         manifest_content, status_code = download_lua_manifest_text(appid, mirror)
-        if mirror == 'manilua' and not manifest_content:
-            info = fetch_game_info(appid)
-            if status_code == 401:
-                msg = create_message('backend.apiKeyRejectedManilua', "API key is rejected by the Manilua mirror. Please check your API key.", appid=appid)
-            elif status_code == 404:
-                if info:
-                    name = info.get('name') or 'Unknown'
-                    msg = create_message('backend.manifestNotFoundManilua', f"Manifest for {name} ({appid}) not found on the Manilua mirror.", appid=appid, name=name)
-                else:
-                    msg = create_message('backend.manifestNotFoundManiluaNoName', f"Manifest for {appid} not found on the Manilua mirror.", appid=appid)
-            else:
-                # Other errors, generic message
-                if info:
-                    name = info.get('name') or 'Unknown'
-                    msg = create_message('backend.manifestNotAvailableManilua', f"Manifest for {name} ({appid}) is not available via the Manilua mirror. Please check your API key.", name=name, appid=appid)
-                else:
-                    msg = create_message('backend.manifestNotAvailableManiluaNoName', f"Manifest for {appid} is not available via the Manilua mirror. Please check your API key.", appid=appid)
+        if not manifest_content:
+            mirror_name = MIRROR_NAMES.get(mirror, 'Unknown')
+            game_info = fetch_game_info(appid)
+            game_name = (game_info or {}).get('name', 'Unknown')
+            msg = create_message('backend.manifestNotFoundOnMirror', 'Manifest for {name} ({appid}) not found on {source} mirror.', appid=appid, source=mirror_name, name=game_name)
             logger.log(msg['details'])
             return {'success': False, **msg, 'dlc': [], 'appid': appid}
 
-        result: dict[str, Any] = {'success': True, 'dlc': [], 'appid': appid}
-        result['dlc'] = collect_dlc_candidates(appid, mirror)
+        result: dict[str, Any] = {'success': True, 'dlc': collect_dlc_candidates(appid, mirror), 'appid': appid}
         return result
 
     @staticmethod

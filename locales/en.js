@@ -99,6 +99,7 @@ const en = {
     manifestNotFoundManilua: "Manifest for {name} ({appid}) not found on the Manilua mirror.",
     manifestNotFoundManiluaNoName: "Manifest for {appid} not found on the Manilua mirror.",
     apiKeyRejectedManilua: "API key is rejected by the Manilua mirror. Please check your API key.",
+    manifestNotFoundOnMirror: "Manifest for {name} ({appid}) not found on {source} mirror.",
     couldNotDetermineAppidFromMessage: "Could not determine AppID from message.",
     maniluaRequiresApiKey: "The Manilua mirror requires a valid API key.",
     dlcAdded: "Added {count} DLC to {target}.",

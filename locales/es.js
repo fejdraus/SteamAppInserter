@@ -100,6 +100,7 @@ const es = {
     manifestNotFoundManilua: "El manifiesto para {name} ({appid}) no se encuentra en el espejo Manilua.",
     manifestNotFoundManiluaNoName: "El manifiesto para {appid} no se encuentra en el espejo Manilua.",
     apiKeyRejectedManilua: "La clave API ha sido rechazada por el espejo Manilua. Comprueba tu clave API.",
+    manifestNotFoundOnMirror: "El manifiesto para {name} ({appid}) no se encontró en el espejo {source}.",
     couldNotDetermineAppidFromMessage: "No se pudo determinar el AppID del mensaje.",
     maniluaRequiresApiKey: "El espejo Manilua requiere una clave API válida.",
     dlcAdded: "Se añadieron {count} DLC a {target}.",

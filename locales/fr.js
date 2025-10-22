@@ -100,6 +100,7 @@ const fr = {
     manifestNotFoundManilua: "Le manifeste pour {name} ({appid}) est introuvable sur le miroir Manilua.",
     manifestNotFoundManiluaNoName: "Le manifeste pour {appid} est introuvable sur le miroir Manilua.",
     apiKeyRejectedManilua: "La clé API a été rejetée par le miroir Manilua. Vérifiez votre clé API.",
+    manifestNotFoundOnMirror: "Le manifeste pour {name} ({appid}) introuvable sur le miroir {source}.",
     couldNotDetermineAppidFromMessage: "Impossible de déterminer l'AppID du message.",
     maniluaRequiresApiKey: "Le miroir Manilua nécessite une clé API valide.",
     dlcAdded: "{count} DLC ajoutés à {target}.",

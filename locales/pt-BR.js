@@ -100,6 +100,7 @@ const ptBR = {
     manifestNotFoundManilua: "O manifesto para {name} ({appid}) não foi encontrado no espelho Manilua.",
     manifestNotFoundManiluaNoName: "O manifesto para {appid} não foi encontrado no espelho Manilua.",
     apiKeyRejectedManilua: "A chave API foi rejeitada pelo espelho Manilua. Verifique sua chave API.",
+    manifestNotFoundOnMirror: "O manifesto para {name} ({appid}) não foi encontrado no espelho {source}.",
     couldNotDetermineAppidFromMessage: "Não foi possível determinar o AppID da mensagem.",
     maniluaRequiresApiKey: "O espelho Manilua requer uma chave API válida.",
     dlcAdded: "{count} DLC adicionados a {target}.",
