@@ -29,7 +29,7 @@ MANIFEST_URLS = (
 STEAMUI_APPINFO = "https://store.steampowered.com/api/appdetails?appids={appid}&cc=en"
 
 # Ryuu mirror URL
-RYUU_DOWNLOAD_URL = "https://ryuu.piracybound.com/manifest/{appid}"
+RYUU_DOWNLOAD_URL = "https://ryuu.piracybound.com/manifest"
 
 # User Agent (fallback when Steam verification is not available)
 USER_AGENT = f'manilua-plugin/{VERSION} (Millennium)'
