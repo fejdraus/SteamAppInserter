@@ -514,6 +514,7 @@ let PluginEntryPointMain = function() { var millennium_main = (function (exports
     mirrors: {
       title: "Elige la fuente de descarga",
       "default": "Espejo público (ManifestHub)",
+      ryuu: "Ryuu",
       maniluaUnderConstruction: "API de Manilua (en desarrollo)",
       maniluaDisabled: "",
       manilua: "API de Manilua (requiere clave)"
@@ -633,6 +634,7 @@ let PluginEntryPointMain = function() { var millennium_main = (function (exports
     mirrors: {
       title: "Choisissez la source de telechargement",
       "default": "Miroir public (ManifestHub)",
+      ryuu: "Ryuu",
       maniluaUnderConstruction: "API Manilua (en cours de developpement)",
       maniluaDisabled: "",
       manilua: "API Manilua (cle requise)"
@@ -752,6 +754,7 @@ let PluginEntryPointMain = function() { var millennium_main = (function (exports
     mirrors: {
       title: "Escolha a fonte de download",
       "default": "Espelho público (ManifestHub)",
+      ryuu: "Ryuu",
       maniluaUnderConstruction: "API Manilua (em desenvolvimento)",
       maniluaDisabled: "",
       manilua: "API Manilua (requer chave)"
