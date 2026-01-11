@@ -410,7 +410,8 @@ def download_lua_manifest_ryuu(appid: str) -> tuple[Optional[str], Optional[int]
         url = f"{RYUU_DOWNLOAD_URL}/{appid}"
         logger.log(f"Downloading from Ryuu API: {url}")
 
-        response = requests.get(url, timeout=HTTP_TIMEOUT)
+        headers = {"User-Agent": "RyuuManifestToolV2/1.0"}
+        response = requests.get(url, headers=headers, timeout=HTTP_TIMEOUT)
 
         if response.status_code == 404:
             logger.log(f"Game {appid} not found on Ryuu mirror.")
@@ -661,7 +662,8 @@ def build_dlc_lua_from_manifest(manifest: dict[str, Any], dlc_appid: str) -> Opt
 def fetch_game_info(appid: str) -> Optional[dict[str, Any]]:
     url = STEAMUI_APPINFO.format(appid=appid)
     try:
-        response = requests.get(url, timeout=HTTP_TIMEOUT)
+        headers = {"User-Agent": "RyuuManifestToolV2/1.0"}
+        response = requests.get(url, headers=headers, timeout=HTTP_TIMEOUT)
         if response.status_code != 200:
             logger.log(f"Steam API returned {response.status_code} for {appid}")
             return None
