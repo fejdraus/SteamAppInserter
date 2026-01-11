@@ -56,7 +56,6 @@ tmp/
 /node_modules
 /release-assets
 package-lock.json
-package.json
 pnpm-lock.yaml
 CLAUDE.md
 RELEASE_DESCRIPTION.md

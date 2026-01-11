@@ -1,0 +1,27 @@
+{
+  "scripts": {
+    "dev": "millennium-ttc --build dev",
+    "build": "millennium-ttc --build prod"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.28.3",
+    "@babel/preset-react": "^7.27.1",
+    "@babel/traverse": "^7.28.3",
+    "@types/react": "^19.1.11",
+    "@types/react-dom": "^19.1.7",
+    "@types/webpack": "^5.28.5"
+  },
+  "type": "module",
+  "name": "steam-app-adder",
+  "version": "1.0.2",
+  "description": "A plugin to add steam apps with manifests.",
+  "main": "webkit/index.tsx",
+  "author": "fejdraus",
+  "license": "MIT",
+  "dependencies": {
+    "@steambrew/api": "^5.6.0",
+    "@steambrew/client": "^5.6.0",
+    "@steambrew/ttc": "^2.7.5",
+    "@steambrew/webkit": "^5.6.0"
+  }
+}
