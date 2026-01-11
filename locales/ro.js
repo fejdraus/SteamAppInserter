@@ -72,6 +72,7 @@ const ro = {
   mirrors: {
     title: "Alege sursa de descărcare",
     default: "Mirror public (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (în dezvoltare)",
     maniluaDisabled: "",
   },

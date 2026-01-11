@@ -72,6 +72,7 @@ const vi = {
   mirrors: {
     title: "Chọn nguồn tải xuống",
     default: "Mirror công khai (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (đang phát triển)",
     maniluaDisabled: "",
   },

@@ -72,6 +72,7 @@ const ar = {
   mirrors: {
     title: "اختر مصدر التحميل",
     default: "المرايا العامة (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (قيد التطوير)",
     maniluaDisabled: "",
   },

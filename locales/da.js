@@ -72,6 +72,7 @@ const da = {
   mirrors: {
     title: "Vælg downloadkilde",
     default: "Offentligt spejl (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (under udvikling)",
     maniluaDisabled: "",
   },

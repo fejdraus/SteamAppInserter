@@ -72,6 +72,7 @@ const nl = {
   mirrors: {
     title: "Downloadbron kiezen",
     default: "Openbare mirror (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (in ontwikkeling)",
     maniluaDisabled: "",
   },

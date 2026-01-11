@@ -72,6 +72,7 @@ const de = {
   mirrors: {
     title: "Download-Quelle wählen",
     default: "Öffentlicher Spiegel (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua-API (in Entwicklung)",
     maniluaDisabled: "",
     manilua: "Manilua-API (Schlüssel erforderlich)",

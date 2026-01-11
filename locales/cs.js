@@ -72,6 +72,7 @@ const cs = {
   mirrors: {
     title: "Vybrat zdroj stahování",
     default: "Veřejné zrcadlo (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (ve vývoji)",
     maniluaDisabled: "",
   },

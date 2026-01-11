@@ -72,6 +72,7 @@ const el = {
   mirrors: {
     title: "Επιλέξτε πηγή λήψης",
     default: "Δημόσιος καθρέφτης (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (υπό ανάπτυξη)",
     maniluaDisabled: "",
   },

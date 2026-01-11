@@ -72,6 +72,7 @@ const bg = {
   mirrors: {
     title: "Избери източник за изтегляне",
     default: "Публично огледало (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (в разработка)",
     maniluaDisabled: "",
   },

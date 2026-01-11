@@ -72,6 +72,7 @@ const zhTW = {
   mirrors: {
     title: "選擇下載來源",
     default: "公共鏡像 (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (開發中)",
     maniluaDisabled: "",
   },

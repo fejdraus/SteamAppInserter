@@ -72,6 +72,7 @@ const pl = {
   mirrors: {
     title: "Wybierz źródło pobierania",
     default: "Publiczne lustro (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (w trakcie rozwoju)",
     maniluaDisabled: "",
   },

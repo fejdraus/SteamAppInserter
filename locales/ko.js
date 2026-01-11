@@ -72,6 +72,7 @@ const ko = {
   mirrors: {
     title: "다운로드 소스 선택",
     default: "공개 미러 (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (개발 중)",
     maniluaDisabled: "",
   },

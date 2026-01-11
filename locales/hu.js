@@ -72,6 +72,7 @@ const hu = {
   mirrors: {
     title: "Válassza ki a letöltési forrást",
     default: "Nyilvános tükörszerver (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (fejlesztés alatt)",
     maniluaDisabled: "",
   },

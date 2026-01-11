@@ -72,6 +72,7 @@ const tr = {
   mirrors: {
     title: "İndirme kaynağını seç",
     default: "Genel ayna (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (geliştirilmekte)",
     maniluaDisabled: "",
   },

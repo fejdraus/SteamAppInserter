@@ -72,6 +72,7 @@ const fi = {
   mirrors: {
     title: "Valitse latauslähde",
     default: "Julkinen peili (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (kehityksessä)",
     maniluaDisabled: "",
   },

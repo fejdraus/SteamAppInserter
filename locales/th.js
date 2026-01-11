@@ -72,6 +72,7 @@ const th = {
   mirrors: {
     title: "เลือกแหล่งดาวน์โหลด",
     default: "Mirror สาธารณะ (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (อยู่ระหว่างพัฒนา)",
     maniluaDisabled: "",
   },

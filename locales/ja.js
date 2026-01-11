@@ -72,6 +72,7 @@ const ja = {
   mirrors: {
     title: "ダウンロードソースを選択",
     default: "公開ミラー (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (開発中)",
     maniluaDisabled: "",
   },

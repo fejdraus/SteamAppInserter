@@ -72,6 +72,7 @@ const sv = {
   mirrors: {
     title: "Välj nedladdningskälla",
     default: "Offentlig spegel (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (under utveckling)",
     maniluaDisabled: "",
   },

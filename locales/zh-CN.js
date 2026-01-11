@@ -72,6 +72,7 @@ const zhCN = {
   mirrors: {
     title: "选择下载源",
     default: "公共镜像 (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (开发中)",
     maniluaDisabled: "",
   },
