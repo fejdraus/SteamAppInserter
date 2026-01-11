@@ -46,18 +46,70 @@ def extract_zip(zip_path, extract_to):
         return False
 
 
-def install_steambrew():
-    print("Installing SteamBrew (Millennium)...")
+def kill_steam():
+    print('Closing Steam...')
     try:
-        subprocess.run([
-            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-            "iwr -useb 'https://steambrew.app/install.ps1' | iex"
-        ], check=True)
-        print("SteamBrew installation completed")
+        subprocess.run(['taskkill', '/F', '/IM', 'steam.exe'], capture_output=True, check=False)
+        subprocess.run(['taskkill', '/F', '/IM', 'steamwebhelper.exe'], capture_output=True, check=False)
+        import time
+        time.sleep(2)
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error installing SteamBrew: {e}")
+    except Exception as e:
+        print(f'Warning: Could not kill Steam processes: {e}')
+        return True
+
+
+def install_millennium(steam_path):
+    print('Installing Millennium...')
+    import tempfile
+    import hashlib
+    api_url = 'https://api.github.com/repos/SteamClientHomebrew/Millennium/releases/latest'
+    try:
+        response = requests.get(api_url)
+        response.raise_for_status()
+        release_info = response.json()
+    except requests.RequestException as e:
+        print(f'Error fetching Millennium release info: {e}')
         return False
+    windows_asset = None
+    sha256_asset = None
+    for asset in release_info.get('assets', []):
+        name = asset['name']
+        if 'windows-x86_64.zip' in name and not name.endswith('.sha256'):
+            windows_asset = asset
+        elif 'windows-x86_64.sha256' in name:
+            sha256_asset = asset
+    if not windows_asset:
+        print('Error: Could not find Windows release')
+        return False
+    print(f'Found Millennium {release_info["tag_name"]}')
+    temp_dir = tempfile.gettempdir()
+    zip_path = os.path.join(temp_dir, windows_asset['name'])
+    if not download_file(windows_asset['browser_download_url'], zip_path):
+        return False
+    if sha256_asset:
+        print('Verifying file integrity...')
+        try:
+            sha_response = requests.get(sha256_asset['browser_download_url'])
+            expected_hash = sha_response.text.strip().split()[0].lower()
+            with open(zip_path, 'rb') as f:
+                actual_hash = hashlib.sha256(f.read()).hexdigest().lower()
+            if expected_hash != actual_hash:
+                print('Error: SHA256 mismatch!')
+                os.remove(zip_path)
+                return False
+            print('SHA256 verification passed')
+        except Exception as e:
+            print(f'Warning: Could not verify SHA256: {e}')
+    kill_steam()
+    if not extract_zip(zip_path, steam_path):
+        return False
+    try:
+        os.remove(zip_path)
+    except OSError:
+        pass
+    print('Millennium installation completed')
+    return True
 
 
 def install_steam_plugins(steam_path):
@@ -66,7 +118,7 @@ def install_steam_plugins(steam_path):
 
     print(f"Installing plugins to: {plugins_folder}")
 
-    source_url = "https://github.com/fejdraus/steamappadder/releases/download/release/release.zip"
+    source_url = "https://github.com/fejdraus/SteamAppInserter/releases/download/release/release.zip"
     zip_file = os.path.join(plugins_folder, "download.zip")
 
     if not download_file(source_url, zip_file):
@@ -109,7 +161,7 @@ def config_millenium(steam_path):
         else:
             print("Plugin already enabled in millennium.ini")
     else:
-        millennium_url = "https://github.com/fejdraus/steamappadder/releases/download/release/millennium.ini"
+        millennium_url = "https://github.com/fejdraus/SteamAppInserter/releases/download/release/millennium.ini"
         download_file(millennium_url, millennium_path)
 
     # config.json - only download if doesn't exist (don't overwrite user settings)
@@ -117,7 +169,7 @@ def config_millenium(steam_path):
     if os.path.exists(config_path):
         print(f"config.json already exists, skipping (preserving user settings)")
     else:
-        config_url = "https://github.com/fejdraus/steamappadder/releases/download/release/config.json"
+        config_url = "https://github.com/fejdraus/SteamAppInserter/releases/download/release/config.json"
         download_file(config_url, config_path)
 
 def main():
@@ -138,8 +190,8 @@ def main():
     print(f"Steam found at: {steam_path}")
 
     # Install SteamBrew (Millennium) - this handles .lua files
-    if not install_steambrew():
-        print("Warning: SteamBrew installation failed")
+    if not install_millennium(steam_path):
+        print("Warning: Millennium installation failed")
         return 1
 
     # Configure Millennium
