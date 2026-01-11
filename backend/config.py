@@ -27,7 +27,8 @@ MANIFEST_URLS = (
 )
 
 STEAMUI_APPINFO = "https://store.steampowered.com/api/appdetails?appids={appid}&cc=en"
-n# Ryuu mirror URL
+
+# Ryuu mirror URL
 RYUU_DOWNLOAD_URL = "https://ryuu.piracybound.com/manifest/{appid}"
 
 # User Agent (fallback when Steam verification is not available)
