@@ -13,7 +13,7 @@
   },
   "type": "module",
   "name": "steam-app-adder",
-  "version": "1.0.2",
+  "version": "1.0.6",
   "description": "A plugin to add steam apps with manifests.",
   "main": "webkit/index.tsx",
   "author": "fejdraus",

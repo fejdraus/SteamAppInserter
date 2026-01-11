@@ -1,0 +1,25 @@
+{
+  "general": {
+    "injectJavascript": true,
+    "injectCSS": true,
+    "checkForMillenniumUpdates": true,
+    "checkForPluginAndThemeUpdates": true,
+    "onMillenniumUpdate": 2,
+    "shouldShowThemePluginUpdateNotifications": true,
+    "accentColor": "DEFAULT_ACCENT_COLOR"
+  },
+  "misc": {
+    "hasShownWelcomeModal": true
+  },
+  "themes": {
+    "activeTheme": "default",
+    "allowedStyles": true,
+    "allowedScripts": true,
+    "conditions": {}
+  },
+  "notifications": {
+    "showNotifications": true,
+    "showUpdateNotifications": true,
+    "showPluginNotifications": true
+  }
+}

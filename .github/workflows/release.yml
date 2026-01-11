@@ -1,0 +1,84 @@
+name: Create Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'plugin.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build plugin
+        run: pnpm run build
+
+      - name: Get version from plugin.json
+        id: version
+        run: |
+          VERSION=$(grep -o '"version": *"[^"]*"' plugin.json | head -1 | cut -d'"' -f4)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create release archive
+        run: |
+          mkdir -p release/SteamAppInserter
+
+          # Copy only necessary files
+          cp -r .millennium release/SteamAppInserter/
+          cp -r backend release/SteamAppInserter/
+          cp LICENSE release/SteamAppInserter/
+          cp plugin.json release/SteamAppInserter/
+
+          # Remove unnecessary files
+          rm -rf release/SteamAppInserter/backend/__pycache__
+          rm -f release/SteamAppInserter/backend/api_key.txt
+
+          # Create archive named release.zip for installer compatibility
+          cd release
+          zip -r ../release.zip SteamAppInserter
+
+      - name: Delete existing release tag
+        run: |
+          gh release delete release --yes || true
+          git push origin :refs/tags/release || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Steam App Inserter v${{ steps.version.outputs.version }}
+          tag_name: release
+          draft: false
+          prerelease: false
+          files: |
+            release.zip
+            installer/millennium.ini
+            installer/config.json
+          body: |
+            ## Steam App Inserter v${{ steps.version.outputs.version }}
+
+            ### Installation
+            Download and run the installer, or manually extract `release.zip` to `Steam/plugins/`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

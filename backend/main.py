@@ -17,6 +17,7 @@ from config import (
     CACHE_EXPIRY_SECONDS,
     MANIFEST_URLS,
     STEAMUI_APPINFO,
+    RYUU_DOWNLOAD_URL,
 )
 
 try:
@@ -127,7 +128,7 @@ except Exception:
         return None
 
 
-MIRROR_NAMES = {'default': 'ManifestHub', 'manilua': 'Manilua'}
+MIRROR_NAMES = {'default': 'ManifestHub', 'manilua': 'Manilua', 'ryuu': 'Ryuu'}
 _cache: dict[str, tuple[Any, float]] = {}
 
 
@@ -327,6 +328,120 @@ def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]
     return result
 
 
+def _extract_ryuu_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]:
+    """Extract Ryuu archive (ZIP with .lua and .manifest files)."""
+    result: dict[str, Any] = {
+        'success': False,
+        'lua_content': None,
+        'installed_files': [],
+        'error': None
+    }
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+            file_list = archive.namelist()
+            logger.log(f"Ryuu archive for {appid} contains {len(file_list)} files: {file_list}")
+
+            stplug_in_dir = get_stplug_in_path()
+            depotcache_dir = get_depotcache_path()
+
+            _ensure_directory(stplug_in_dir)
+            _ensure_directory(depotcache_dir)
+
+            lua_files_found = []
+
+            for file_name in file_list:
+                if file_name.endswith('/'):
+                    continue
+
+                base_name = os.path.basename(file_name)
+                file_name_lower = file_name.lower()
+
+                try:
+                    file_content = archive.read(file_name)
+
+                    if file_name_lower.endswith('.lua'):
+                        # Don't write .lua file here - just return content
+                        # The actual file writing is handled by install_dlcs
+                        try:
+                            decoded = file_content.decode('utf-8')
+                            lua_files_found.append(decoded)
+                            logger.log(f"Read lua content from {file_name} ({len(decoded)} chars)")
+                        except UnicodeDecodeError:
+                            lua_files_found.append(file_content.decode('utf-8', errors='replace'))
+                            logger.log(f"Read lua content from {file_name} (with decode errors)")
+
+                    elif file_name_lower.endswith('.manifest'):
+                        dest_path = os.path.join(depotcache_dir, base_name)
+                        with open(dest_path, 'wb') as f:
+                            f.write(file_content)
+                        result['installed_files'].append(dest_path)
+                        logger.log(f"Extracted {file_name} → {dest_path}")
+
+                    else:
+                        logger.log(f"Skipping unknown file type in Ryuu archive: {file_name}")
+
+                except Exception as exc:
+                    logger.error(f"Failed to extract {file_name}: {exc}")
+                    continue
+
+            if not lua_files_found:
+                result['error'] = "No .lua files found in Ryuu archive"
+                logger.log(f"Ryuu archive for {appid} did not contain any .lua files")
+                return result
+
+            result['lua_content'] = lua_files_found[0]
+            result['success'] = True
+            logger.log(f"Successfully extracted {len(result['installed_files'])} files from Ryuu archive for {appid}")
+
+    except zipfile.BadZipFile as exc:
+        result['error'] = f"Invalid ZIP file: {exc}"
+        logger.error(f"Ryuu archive for {appid} is not a valid ZIP: {exc}")
+    except Exception as exc:
+        result['error'] = f"Failed to extract archive: {exc}"
+        logger.error(f"Failed to process Ryuu archive for {appid}: {exc}")
+
+    return result
+
+
+def download_lua_manifest_ryuu(appid: str) -> tuple[Optional[str], Optional[int]]:
+    """Download manifest from Ryuu API (no auth required)."""
+    try:
+        url = f"{RYUU_DOWNLOAD_URL}/{appid}"
+        logger.log(f"Downloading from Ryuu API: {url}")
+
+        response = requests.get(url, timeout=HTTP_TIMEOUT)
+
+        if response.status_code == 404:
+            logger.log(f"Game {appid} not found on Ryuu mirror.")
+            return None, 404
+
+        if response.status_code != 200:
+            logger.log(f"Ryuu mirror returned HTTP {response.status_code} for {appid}")
+            return None, response.status_code
+
+        content_type = (response.headers.get("Content-Type") or "").lower()
+        raw = response.content
+
+        if content_type.startswith("application/zip") or raw[:2] == b"PK":
+            extract_result = _extract_ryuu_archive(appid, raw)
+            if extract_result['success']:
+                return extract_result['lua_content'], None
+            else:
+                logger.log(f"Ryuu archive extraction failed: {extract_result.get('error', 'Unknown error')}")
+                return None, None
+
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            text = raw.decode("utf-8", errors="replace")
+
+        return text if text.strip() else None, None
+    except Exception as exc:
+        logger.log(f"Failed to download manifest from Ryuu mirror for {appid}: {exc}")
+        return None, None
+
+
 def download_lua_manifest_manilua(appid: str, api_key: str) -> tuple[Optional[str], Optional[int]]:
     try:
         client = get_global_client()
@@ -465,6 +580,8 @@ def download_lua_manifest_text(appid: str, mirror: str = 'default') -> tuple[Opt
                 return text if text.strip() else None, None
         except Exception:
             return None, None
+    elif mirror == 'ryuu':
+        return download_lua_manifest_ryuu(appid)
     else:
         content = _download_text(_build_manifest_urls(appid, '.lua'))
         return content, None
@@ -482,6 +599,8 @@ def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
             logger.log("Manilua mirror requested but API key is not configured.")
             return None
         result, _ = download_lua_manifest_manilua(appid, api_key)
+    elif mirror_key == 'ryuu':
+        result, _ = download_lua_manifest_ryuu(appid)
     else:
         result = _download_text(_build_manifest_urls(appid, '.lua'))
 
@@ -686,10 +805,81 @@ def remove_dlc_entries_from_content(content: str, dlcs_to_remove: set[str], main
     return '\n'.join(filtered_lines).rstrip('\r\n')
 
 
+def extract_keys_from_lua_content(content: str) -> dict[str, str]:
+    """Extract decryption keys from lua content (works with Ryuu format: addappid(id,0,"key"))."""
+    keys: dict[str, str] = {}
+    for match in re.finditer(r'addappid\(\s*(\d+)\s*,\s*\d+\s*,\s*"([^"]+)"\s*\)', content):
+        appid = match.group(1)
+        key = match.group(2).strip()
+        if key:
+            keys[appid] = key
+    return keys
+
+
+def extract_manifest_ids_from_lua(content: str) -> dict[str, str]:
+    """Extract manifest IDs from lua content (Ryuu format: setManifestid(id,"manifestid"))."""
+    manifest_ids: dict[str, str] = {}
+    for match in re.finditer(r'setManifestid\(\s*(\d+)\s*,\s*"([^"]+)"\s*\)', content):
+        appid = match.group(1)
+        manifest_id = match.group(2).strip()
+        if manifest_id:
+            manifest_ids[appid] = manifest_id
+    return manifest_ids
+
+
+def extract_all_appids_from_lua(content: str, main_appid: str) -> list[str]:
+    """Extract all appids from lua content (excluding main app)."""
+    appids: list[str] = []
+    for match in re.finditer(r'addappid\(\s*(\d+)', content):
+        appid = match.group(1)
+        if appid != main_appid and appid not in appids:
+            appids.append(appid)
+    return appids
+
+
+def remove_all_dlc_entries(content: str, main_appid: str) -> str:
+    """Remove all addappid/setManifestid entries except the main app (for Ryuu format)."""
+    lines = content.split('\n')
+    filtered_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Skip setManifestid lines for non-main apps
+        if 'setManifestid' in line:
+            match = re.search(r'setManifestid\(\s*(\d+)', line)
+            if match and match.group(1) != main_appid:
+                continue
+
+        # Check addappid lines
+        if 'addappid(' in line:
+            match = re.search(r'addappid\(\s*(\d+)', line)
+            if match:
+                found_id = match.group(1)
+                # Keep only the main app entry
+                if found_id != main_appid:
+                    continue
+
+        filtered_lines.append(line)
+
+    return '\n'.join(filtered_lines).rstrip('\r\n')
+
+
 def fetch_dlc_decryption_keys(dlc_ids: list[str], main_appid: str, main_game_json: Optional[dict[str, Any]] = None, mirror: str = 'default') -> dict[str, str]:
     keys: dict[str, str] = {}
     wanted = [d for d in dlc_ids if d and d.isdigit()]
     if not wanted:
+        return keys
+
+    # For Ryuu mirror - extract keys directly from the lua file
+    if mirror == 'ryuu':
+        try:
+            lua_content = download_lua_manifest(main_appid, 'ryuu')
+            if lua_content:
+                keys = extract_keys_from_lua_content(lua_content)
+                logger.log(f'fetch_dlc_decryption_keys: extracted {len(keys)} keys from Ryuu lua for {main_appid}')
+        except Exception as exc:
+            logger.log(f'fetch_dlc_decryption_keys: Ryuu lua parse failed for {main_appid}: {exc}')
         return keys
 
     if mirror != 'manilua':
@@ -852,6 +1042,69 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
     installed_dlc_ids = set()
     manilua_dlc_list: list[dict[str, Any]] = []
 
+    # For Ryuu - use Steam API DLC list but verify availability in Ryuu manifest
+    if mirror == 'ryuu':
+        logger.log(f"Fetching DLC list from Ryuu API for {appid}")
+        ryuu_content = download_lua_manifest(appid, 'ryuu')
+        if not ryuu_content:
+            logger.log(f"Failed to download Ryuu manifest for {appid}")
+            return []
+
+        # Extract data from Ryuu file
+        ryuu_all_appids = extract_all_appids_from_lua(ryuu_content, appid)
+        ryuu_keys = extract_keys_from_lua_content(ryuu_content)
+        logger.log(f"Ryuu manifest for {appid}: {len(ryuu_all_appids)} entries, {len(ryuu_keys)} keys")
+
+        # Get actual DLC list from Steam API (type = 'dlc')
+        steam_dlc_appids: set[str] = set()
+        for item in related:
+            if isinstance(item, dict):
+                steam_dlc_appids.add(str(item.get('appid', '')))
+        logger.log(f"Steam API DLC list: {len(steam_dlc_appids)} items")
+
+        # Only show DLC that are both in Steam API and in Ryuu file
+        valid_dlc_appids = steam_dlc_appids & set(ryuu_all_appids)
+        logger.log(f"Valid DLC (in both Steam and Ryuu): {len(valid_dlc_appids)} items")
+
+        # Check which DLC are already installed locally
+        if os.path.isfile(main_file):
+            try:
+                with open(main_file, 'r', encoding='utf-8') as f:
+                    local_content = f.read()
+                    for match in re.finditer(r'addappid\((\d+)', local_content):
+                        found_id = match.group(1)
+                        if found_id != appid:
+                            installed_dlc_ids.add(found_id)
+            except Exception as e:
+                logger.log(f"Error reading {main_file}: {e}")
+
+        # Build candidates from valid DLC list only
+        candidates: list[dict[str, Any]] = []
+        for dlc_appid in valid_dlc_appids:
+            # Get name from Steam API
+            dlc_name = f'DLC {dlc_appid}'
+            for item in related:
+                if isinstance(item, dict) and str(item.get('appid', '')) == dlc_appid:
+                    dlc_name = item.get('name') or dlc_name
+                    break
+
+            already_installed = dlc_appid in installed_dlc_ids
+            decryption_key = ryuu_keys.get(dlc_appid)
+
+            candidate_data: dict[str, Any] = {
+                'appid': dlc_appid,
+                'name': dlc_name,
+                'alreadyInstalled': already_installed,
+                'source': 'ryuu'
+            }
+            if decryption_key:
+                candidate_data['decryptionKey'] = decryption_key
+
+            candidates.append(candidate_data)
+            logger.log(f"Ryuu DLC {dlc_appid} ({dlc_name}): alreadyInstalled={already_installed}, key={'present' if decryption_key else 'none'}")
+
+        return candidates
+
     if mirror == 'manilua' and get_plugin().get_api_key():
 
         user_installed_dlcs = set()
@@ -925,7 +1178,12 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
     dlc_keys_map: dict[str, str] = {}
     if is_application:
         dlc_ids = [dlc_id for dlc_id, _ in dlc_items]
-        dlc_keys_map = fetch_dlc_decryption_keys(dlc_ids, appid, main_game_json)
+        # For Ryuu - get keys from Ryuu manifest, for others - from JSON
+        if mirror == 'ryuu':
+            dlc_keys_map = fetch_dlc_decryption_keys(dlc_ids, appid, None, 'ryuu')
+            logger.log(f"Ryuu keys for {appid}: {len(dlc_keys_map)} keys found")
+        else:
+            dlc_keys_map = fetch_dlc_decryption_keys(dlc_ids, appid, main_game_json, mirror)
 
     candidates: list[dict[str, Any]] = []
     steamui_dlc_ids = set()
@@ -1077,17 +1335,39 @@ class Backend:
         return True
 
     @staticmethod
-    def checkpirated(id: str):
-        manifest_path = get_manifest_path(id)
+    def checkpirated(payload: Any = None, **kwargs) -> bool:
+        data: dict[str, Any] = {}
+        if isinstance(payload, dict):
+            data.update(payload)
+        elif payload is not None:
+            data['id'] = payload
+        if kwargs:
+            data.update(kwargs)
+        appid = str(data.get('id', '') or data.get('appid', '') or '').strip()
+        if not appid:
+            return False
+        manifest_path = get_manifest_path(appid)
         return os.path.exists(manifest_path)
 
     @staticmethod
-    def delete_lua(id: str):
+    def delete_lua(payload: Any = None, **kwargs) -> bool:
+        data: dict[str, Any] = {}
+        if isinstance(payload, dict):
+            data.update(payload)
+        elif payload is not None:
+            data['id'] = payload
+        if kwargs:
+            data.update(kwargs)
+        appid = str(data.get('id', '') or data.get('appid', '') or '').strip()
+        if not appid:
+            logger.log("delete_lua: No appid provided")
+            return False
+
         removed_files = []
         errors = []
 
         stplug_in_dir = get_stplug_in_path()
-        lua_file = os.path.join(stplug_in_dir, f'{id}.lua')
+        lua_file = os.path.join(stplug_in_dir, f'{appid}.lua')
 
         depot_ids = set()
         if os.path.isfile(lua_file):
@@ -1153,7 +1433,7 @@ class Backend:
                 errors.append(f"Failed to scan StatsExport directory: {exc}")
                 logger.log(errors[-1])
 
-        json_file = os.path.join(stplug_in_dir, f'{id}.json')
+        json_file = os.path.join(stplug_in_dir, f'{appid}.json')
         if os.path.isfile(json_file):
             try:
                 os.remove(json_file)
@@ -1164,13 +1444,13 @@ class Backend:
                 logger.log(errors[-1])
 
         if removed_files:
-            logger.log(f"Successfully removed {len(removed_files)} file(s) for {id}")
+            logger.log(f"Successfully removed {len(removed_files)} file(s) for {appid}")
             return True
         elif errors:
-            logger.log(f"Failed to remove files for {id}: {'; '.join(errors)}")
+            logger.log(f"Failed to remove files for {appid}: {'; '.join(errors)}")
             return False
         else:
-            logger.log(f"No files found for {id}")
+            logger.log(f"No files found for {appid}")
             return False
 
     @staticmethod
@@ -1354,6 +1634,10 @@ class Backend:
                     msg = create_message('backend.manifestNotAvailableManiluaNoName',
                                          f'Manifest for {appid} is not available via the Manilua mirror. Please verify your API key.',
                                          appid=appid)
+                elif mirror == 'ryuu':
+                    msg = create_message('backend.manifestNotAvailableRyuuNoName',
+                                         f'Manifest for {appid} is not available via the Ryuu mirror.',
+                                         appid=appid)
                 else:
                     msg = create_message('backend.manifestNotAvailablePublicNoName',
                                          f'Manifest for {appid} is not available on the public mirrors.',
@@ -1361,17 +1645,33 @@ class Backend:
                 logger.log(msg['details'])
                 return {'success': False, **msg, 'installed': [], 'failed': requested}
 
-            json_data = download_json_manifest(appid)
-            if json_data:
-                lua_content = process_lua_content(lua_content, json_data)
-            if mirror == 'manilua':
-                lua_content = remove_dlc_entries_from_content(lua_content, set(), appid)
+            # Ryuu already provides complete lua with keys, no processing needed
+            if mirror == 'ryuu':
+                logger.log(f'Using Ryuu lua content as-is for {appid}')
+            else:
+                json_data = download_json_manifest(appid)
+                if json_data:
+                    lua_content = process_lua_content(lua_content, json_data)
+                if mirror == 'manilua':
+                    lua_content = remove_dlc_entries_from_content(lua_content, set(), appid)
 
             write_lua_file(appid, lua_content)
 
         with open(base_game_path, 'r', encoding='utf-8') as handle:
             base_content = handle.read()
-        if mirror == 'manilua':
+
+        # For Ryuu - extract keys and manifest IDs from fresh download, metadata will be empty (no comments)
+        ryuu_keys: dict[str, str] = {}
+        ryuu_manifest_ids: dict[str, str] = {}
+        if mirror == 'ryuu':
+            logger.log(f'Extracting keys and manifest IDs from fresh Ryuu manifest for {appid}')
+            ryuu_fresh_content = download_lua_manifest(appid, 'ryuu')
+            if ryuu_fresh_content:
+                ryuu_keys = extract_keys_from_lua_content(ryuu_fresh_content)
+                ryuu_manifest_ids = extract_manifest_ids_from_lua(ryuu_fresh_content)
+                logger.log(f'Extracted {len(ryuu_keys)} keys and {len(ryuu_manifest_ids)} manifest IDs from Ryuu')
+            manilua_metadata = {}  # Ryuu has no comments/metadata
+        elif mirror == 'manilua':
             logger.log(f'Extracting DLC metadata from fresh Manilua manifest for {appid}')
             manilua_fresh_content = download_lua_manifest(appid, 'manilua')
             if manilua_fresh_content:
@@ -1397,10 +1697,127 @@ class Backend:
                         all_available_dlc.add(dlc_appid)
         dlc_keys_map = fetch_dlc_decryption_keys(requested, appid, None, mirror)
 
+        # For Ryuu - merge ryuu_keys into dlc_keys_map (ryuu_keys takes priority)
+        if mirror == 'ryuu' and ryuu_keys:
+            for k, v in ryuu_keys.items():
+                if k not in dlc_keys_map:
+                    dlc_keys_map[k] = v
+
+        # For Ryuu - smart merge: keep depot lines, manage only actual DLC lines
+        if mirror == 'ryuu':
+            # Known DLC = only from Steam API (actual DLC, not depots)
+            known_dlc_appids: set[str] = set(all_available_dlc)
+            logger.log(f'Steam API DLC appids: {known_dlc_appids}')
+            logger.log(f'Requested DLC: {requested}')
+
+            # Identify depot entries (have key in addappid AND setManifestid)
+            depot_appids: set[str] = set()
+            for app_id in ryuu_keys:
+                if app_id in ryuu_manifest_ids and app_id != appid:
+                    depot_appids.add(app_id)
+            logger.log(f'Depot appids (have key + manifest): {len(depot_appids)} entries')
+
+            # Parse file line by line
+            lines = base_content.split('\n')
+            non_dlc_lines: list[str] = []
+            kept_dlc_appids: set[str] = set()
+
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    non_dlc_lines.append(line)
+                    continue
+
+                # Check if this line is addappid
+                match = re.search(r'addappid\(\s*(\d+)', line)
+                if match:
+                    line_appid = match.group(1)
+                    # Is this main app?
+                    if line_appid == appid:
+                        non_dlc_lines.append(line)
+                    # Is this a depot? (has key + manifest) - always keep
+                    elif line_appid in depot_appids:
+                        non_dlc_lines.append(line)
+                    # Is this an actual DLC from Steam API?
+                    elif line_appid in known_dlc_appids:
+                        # This is a real DLC - check if selected
+                        if line_appid in requested:
+                            # Add comment with DLC name if missing
+                            if '--' not in line:
+                                dlc_info = dlc_info_map.get(line_appid, {})
+                                dlc_name = dlc_info.get('name') or f'DLC {line_appid}'
+                                line = line.rstrip() + f' -- {dlc_name}'
+                            non_dlc_lines.append(line)
+                            kept_dlc_appids.add(line_appid)
+                        else:
+                            logger.log(f'Removing unselected DLC {line_appid}')
+                    else:
+                        # Unknown appid (not DLC, not depot) - keep it (could be dependency)
+                        non_dlc_lines.append(line)
+                    continue
+
+                # Check if this line is setManifestid
+                match = re.search(r'setManifestid\(\s*(\d+)', line)
+                if match:
+                    line_appid = match.group(1)
+                    # Is this a depot manifest? - always keep
+                    if line_appid in depot_appids:
+                        non_dlc_lines.append(line)
+                    # Is this a DLC manifest?
+                    elif line_appid in known_dlc_appids:
+                        # Keep only if DLC is selected
+                        if line_appid in requested:
+                            non_dlc_lines.append(line)
+                        else:
+                            logger.log(f'Removing setManifestid for unselected DLC {line_appid}')
+                    else:
+                        # Unknown - keep it
+                        non_dlc_lines.append(line)
+                    continue
+
+                # Other lines - keep them
+                non_dlc_lines.append(line)
+
+            # Now add requested DLC that are not yet in file
+            dlc_lines: list[str] = []
+            for dlc_appid in requested:
+                if dlc_appid in kept_dlc_appids:
+                    continue  # Already in file
+
+                # Add new DLC
+                dlc_info = dlc_info_map.get(dlc_appid, {})
+                dlc_name = dlc_info.get('name') or f'DLC {dlc_appid}'
+                key = dlc_keys_map.get(dlc_appid, '').strip()
+
+                if key:
+                    dlc_lines.append(f'addappid({dlc_appid},0,"{key}") -- {dlc_name}')
+                else:
+                    dlc_lines.append(f'addappid({dlc_appid}) -- {dlc_name}')
+
+                manifest_id = ryuu_manifest_ids.get(dlc_appid, '').strip()
+                if manifest_id:
+                    dlc_lines.append(f'setManifestid({dlc_appid},"{manifest_id}")')
+
+                logger.log(f'Added new DLC {dlc_appid} to file')
+
+            # Combine: non-DLC lines + new DLC lines
+            final_content = '\n'.join(non_dlc_lines).rstrip('\r\n')
+            if dlc_lines:
+                final_content += '\n' + '\n'.join(dlc_lines)
+
+            target = write_lua_file(appid, final_content)
+            installed_ids = list(requested)
+            msg = create_message('backend.dlcAdded',
+                                 f"Updated DLC in {target}.",
+                                 count=len(installed_ids), target=target)
+            return {'success': True, **msg, 'installed': installed_ids, 'failed': []}
+
+        # For other mirrors (default, manilua) - use existing logic
         if not requested:
             base_content = remove_dlc_entries_from_content(base_content, None, appid)
         else:
             base_content = remove_dlc_entries_from_content(base_content, set(requested), appid)
+
         dlc_lines: list[str] = []
         installed_ids: list[str] = []
 

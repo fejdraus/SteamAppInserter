@@ -72,6 +72,7 @@ const en = {
   mirrors: {
     title: "Choose download source",
     default: "Public mirror (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (in development)",
     maniluaDisabled: "",
   },
@@ -113,6 +114,10 @@ const en = {
     apiKeyRejected: "API key was rejected by the Manilua service.",
     validationRequestFailed: "Validation request failed with HTTP {status}.",
     validationException: "API key validation failed: {error}",
+    manifestNotAvailableRyuu: "Manifest for {name} ({appid}) is not available via the Ryuu mirror.",
+    manifestNotAvailableRyuuNoName: "Manifest for {appid} is not available via the Ryuu mirror.",
+    manifestNotFoundRyuu: "Manifest for {name} ({appid}) not found on the Ryuu mirror.",
+    manifestNotFoundRyuuNoName: "Manifest for {appid} not found on the Ryuu mirror.",
   },
 };
 

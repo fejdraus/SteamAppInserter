@@ -376,7 +376,7 @@ const showProgressDialog = (initial: ProgressStatusKey = 'preparing'): ProgressD
     return { setStatus, close };
 };
 
-type MirrorId = 'default' | 'manilua';
+type MirrorId = 'default' | 'manilua' | 'ryuu';
 
 type MirrorOption = {
     id: MirrorId;
@@ -386,7 +386,8 @@ type MirrorOption = {
 
 const MIRROR_OPTIONS: readonly MirrorOption[] = [
     { id: 'default', labelKey: 'mirrors.default', requiresApiKey: false },
-    { id: 'manilua', labelKey: 'mirrors.maniluaUnderConstruction', requiresApiKey: true },
+    { id: 'ryuu', labelKey: 'mirrors.ryuu', requiresApiKey: false },
+    // { id: 'manilua', labelKey: 'mirrors.maniluaUnderConstruction', requiresApiKey: true },
 ] as const;
 
 type BasicBackendResponse = {
@@ -942,22 +943,11 @@ const showDlcSelection = async (appId: string, dlcList: DlcEntry[], mirror: Mirr
             dlcCheckboxes.push(checkbox);
 
             const textContainer = document.createElement('div');
-            const mainLine = document.createElement('div');
-            mainLine.textContent = entry.name && entry.name.trim().length
+            textContainer.textContent = entry.name && entry.name.trim().length
                 ? entry.name
                 : t('labels.dlcWithId', { id: entry.appid });
-            const secondary = document.createElement('div');
-            secondary.style.fontSize = '12px';
-            secondary.style.opacity = '0.7';
-            const parts: string[] = [];
             if (entry.alreadyInstalled) {
-                parts.push(t('dialogs.selectDlc.alreadyAdded'));
                 checkbox.checked = isEditMode || false;
-            }
-            secondary.textContent = parts.join(' - ');
-            textContainer.appendChild(mainLine);
-            if (secondary.textContent) {
-                textContainer.appendChild(secondary);
             }
 
             label.appendChild(checkbox);

@@ -88,17 +88,37 @@ def install_steam_plugins(steam_path):
 
 
 def config_millenium(steam_path):
-    # Download millennium.ini
     ext_folder = os.path.join(steam_path, "ext")
     os.makedirs(ext_folder, exist_ok=True)
-    millennium_url = "https://github.com/fejdraus/steamappadder/releases/download/release/millennium.ini"
-    millennium_path = os.path.join(ext_folder, "millennium.ini")
-    download_file(millennium_url, millennium_path)
 
-    # Download config.json
-    config_url = "https://github.com/fejdraus/steamappadder/releases/download/release/config.json"
+    # millennium.ini - check if plugin is enabled, add if not
+    millennium_path = os.path.join(ext_folder, "millennium.ini")
+    if os.path.exists(millennium_path):
+        print(f"millennium.ini already exists, checking plugin status...")
+        with open(millennium_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        if 'steam-app-inserter' not in content:
+            # Add plugin to enabled_plugins
+            if 'enabled_plugins' in content:
+                content = content.replace('enabled_plugins = ', 'enabled_plugins = steam-app-inserter|')
+                with open(millennium_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print("Added steam-app-inserter to enabled plugins")
+            else:
+                print("Warning: Could not find enabled_plugins in millennium.ini")
+        else:
+            print("Plugin already enabled in millennium.ini")
+    else:
+        millennium_url = "https://github.com/fejdraus/steamappadder/releases/download/release/millennium.ini"
+        download_file(millennium_url, millennium_path)
+
+    # config.json - only download if doesn't exist (don't overwrite user settings)
     config_path = os.path.join(ext_folder, "config.json")
-    download_file(config_url, config_path)
+    if os.path.exists(config_path):
+        print(f"config.json already exists, skipping (preserving user settings)")
+    else:
+        config_url = "https://github.com/fejdraus/steamappadder/releases/download/release/config.json"
+        download_file(config_url, config_path)
 
 def main():
     os.system("cls")

@@ -74,6 +74,7 @@ const uk = {
   mirrors: {
     title: "Оберіть джерело завантаження",
     default: "Публічне дзеркало (ManifestHub)",
+    ryuu: "Ryuu",
     maniluaUnderConstruction: "API Manilua (у розробці)",
     maniluaDisabled: "",
     manilua: "API Manilua (потрібен ключ)",
@@ -116,6 +117,10 @@ const uk = {
     apiKeyRejected: "API-ключ відхилено сервісом Manilua.",
     validationRequestFailed: "Запит перевірки не вдався з HTTP {status}.",
     validationException: "Перевірка API-ключа не вдалася: {error}",
+    manifestNotAvailableRyuu: "Маніфест для {name} ({appid}) недоступний через дзеркало Ryuu.",
+    manifestNotAvailableRyuuNoName: "Маніфест для {appid} недоступний через дзеркало Ryuu.",
+    manifestNotFoundRyuu: "Маніфест для {name} ({appid}) не знайдено на дзеркалі Ryuu.",
+    manifestNotFoundRyuuNoName: "Маніфест для {appid} не знайдено на дзеркалі Ryuu.",
   },
 };
 
