@@ -1334,7 +1334,47 @@ let PluginEntryPointMain = function() { var millennium_main = (function (exports
           'live service', 'games as a service',
           // Ukrainian
           'багатокористувацька', 'гравець проти гравця', 'гравець проти оточення',
-          'мережева гра', 'кооператив'
+          'мережева гра', 'кооператив',
+          // German
+          'online-pvp', 'online-koop', 'mehrspieler', 'massively multiplayer',
+          'plattformübergreifender mehrspieler', 'koop',
+          // French
+          'pvp en ligne', 'coop en ligne', 'multijoueur', 'multijoueur en ligne',
+          'multijoueur de masse', 'multijoueur multiplateforme',
+          // Spanish
+          'pvp en línea', 'cooperativo en línea', 'multijugador', 'multijugador en línea',
+          'multijugador masivo', 'multijugador multiplataforma',
+          // Italian
+          'pvp online', 'co-op online', 'multigiocatore', 'multigiocatore online',
+          'multigiocatore di massa', 'multigiocatore multipiattaforma',
+          // Portuguese (Brazilian)
+          'pvp online', 'cooperativo online', 'multijogador', 'multijogadores',
+          'multijogador online', 'multijogador massivo', 'multijogador multiplataforma',
+          // Polish
+          'pvp online', 'kooperacja online', 'wieloosobowa', 'wieloosobowy',
+          'sieciowa gra wieloosobowa', 'mmo', 'wieloosobowa międzyplatformowa',
+          // Dutch
+          'online pvp', 'online co-op', 'multiplayer', 'online multiplayer',
+          'massale multiplayer', 'cross-platform multiplayer',
+          // Turkish
+          'çevrimiçi pvp', 'çevrimiçi co-op', 'çok oyunculu', 'çevrimiçi çok oyunculu',
+          'devasa çok oyunculu', 'platformlar arası çok oyunculu',
+          // Czech
+          'online pvp', 'online co-op', 'více hráčů', 'online více hráčů',
+          'mmo', 'více hráčů napříč platformami',
+          // Hungarian
+          'online pvp', 'online co-op', 'többjátékos', 'online többjátékos',
+          'tömeges többjátékos', 'platformok közötti többjátékos',
+          // Japanese
+          'オンライン対戦', 'オンライン協力', 'マルチプレイヤー', 'オンラインマルチプレイヤー',
+          'mmo', 'クロスプラットフォーム',
+          // Korean
+          '온라인 pvp', '온라인 협동', '멀티플레이어', '온라인 멀티플레이어',
+          'mmo', '크로스 플랫폼',
+          // Simplified Chinese
+          '在线pvp', '在线合作', '多人', '在线多人', '大型多人', '跨平台多人',
+          // Traditional Chinese
+          '線上pvp', '線上合作', '多人', '線上多人', '大型多人', '跨平台多人'
       ];
       const inList = (list, terms) => list.some(x => terms.some(t => x.includes(t)));
       const hasOnline = inList(tags, ONLINE) || inList(specs, ONLINE);
