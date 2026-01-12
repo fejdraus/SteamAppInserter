@@ -1334,10 +1334,7 @@ let PluginEntryPointMain = function() { var millennium_main = (function (exports
           'live service', 'games as a service',
           // Ukrainian
           'багатокористувацька', 'гравець проти гравця', 'гравець проти оточення',
-          'мережева гра', 'онлайн', 'кооператив',
-          // Russian
-          'многопользовательская', 'онлайн', 'кооператив', 'pvp', 'pve',
-          'игрок против игрока', 'совместная игра'
+          'мережева гра', 'кооператив'
       ];
       const inList = (list, terms) => list.some(x => terms.some(t => x.includes(t)));
       const hasOnline = inList(tags, ONLINE) || inList(specs, ONLINE);
