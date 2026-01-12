@@ -116,6 +116,13 @@ def install_steam_plugins(steam_path):
     plugins_folder = os.path.join(steam_path, "plugins")
     os.makedirs(plugins_folder, exist_ok=True)
 
+    # Remove old plugin folder to ensure clean install
+    import shutil
+    plugin_folder = os.path.join(plugins_folder, "steam-app-inserter")
+    if os.path.isdir(plugin_folder):
+        print(f"Removing old plugin folder: {plugin_folder}")
+        shutil.rmtree(plugin_folder, ignore_errors=True)
+
     print(f"Installing plugins to: {plugins_folder}")
 
     source_url = "https://github.com/fejdraus/SteamAppInserter/releases/download/release/release.zip"
