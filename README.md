@@ -56,7 +56,7 @@ This plugin is part of a three-component system:
 
 - **Visual Indicator** - Shows game compatibility status directly on store pages
 - **Smart Detection** - Automatically detects online-only games, DRM, and third-party account requirements
-- **Multi-language** - Works with English and Ukrainian Steam interfaces
+- **Multi-language** - Works with 15+ Steam interface languages (EN, UA, DE, FR, ES, IT, PT-BR, PL, NL, TR, CS, HU, JA, KO, ZH)
 - **Color Coding:**
   - 🟢 **Green** - Game should work fine (single-player, no DRM)
   - 🟡 **Yellow** - May have issues (online features, third-party accounts)
