@@ -75,6 +75,7 @@ const tr = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (geliştirilmekte)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Manilua API Anahtarı",

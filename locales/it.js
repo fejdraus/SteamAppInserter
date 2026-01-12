@@ -75,6 +75,7 @@ const it = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (in sviluppo)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Chiave API Manilua",

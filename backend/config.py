@@ -32,5 +32,7 @@ STEAMUI_APPINFO = "https://store.steampowered.com/api/appdetails?appids={appid}&
 KERNELOS_API_BASE = 'https://kernelos.org'
 KERNELOS_DOWNLOAD_URL = f'{KERNELOS_API_BASE}/games/download.php?gen=1&id={{appid}}'
 
+
+
 # User Agent (fallback when Steam verification is not available)
 USER_AGENT = f'manilua-plugin/{VERSION} (Millennium)'

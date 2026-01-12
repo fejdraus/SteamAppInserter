@@ -75,6 +75,7 @@ const fi = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (kehityksessä)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Manilua API-avain",

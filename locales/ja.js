@@ -75,6 +75,7 @@ const ja = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (開発中)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Manilua API キー",

@@ -75,6 +75,7 @@ const bg = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (в разработка)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Manilua API Key",

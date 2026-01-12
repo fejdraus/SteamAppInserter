@@ -75,6 +75,7 @@ const pt = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (em desenvolvimento)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Chave API do Manilua",

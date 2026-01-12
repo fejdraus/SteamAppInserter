@@ -75,6 +75,7 @@ const es419 = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (en desarrollo)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Clave API de Manilua",

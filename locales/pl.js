@@ -75,6 +75,7 @@ const pl = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (w trakcie rozwoju)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Klucz API Manilua",

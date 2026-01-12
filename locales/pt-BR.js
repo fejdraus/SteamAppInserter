@@ -75,6 +75,7 @@ const ptBR = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "API Manilua (em desenvolvimento)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
     manilua: "API Manilua (requer chave)",
   },
   auth: {

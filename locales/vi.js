@@ -75,6 +75,7 @@ const vi = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (đang phát triển)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Khóa API Manilua",

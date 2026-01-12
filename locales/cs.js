@@ -75,6 +75,7 @@ const cs = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (ve vývoji)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Manilua API klíč",

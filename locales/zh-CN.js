@@ -75,6 +75,7 @@ const zhCN = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (开发中)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Manilua API 密钥",

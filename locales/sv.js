@@ -75,6 +75,7 @@ const sv = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (under utveckling)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Manilua API-nyckel",

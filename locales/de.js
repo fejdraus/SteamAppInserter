@@ -75,6 +75,7 @@ const de = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua-API (in Entwicklung)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
     manilua: "Manilua-API (Schlüssel erforderlich)",
   },
   auth: {

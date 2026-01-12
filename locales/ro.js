@@ -75,6 +75,7 @@ const ro = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (în dezvoltare)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "Cheia API Manilua",

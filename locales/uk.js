@@ -77,6 +77,7 @@ const uk = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "API Manilua (у розробці)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
     manilua: "API Manilua (потрібен ключ)",
   },
   auth: {

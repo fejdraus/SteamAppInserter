@@ -486,6 +486,42 @@ def download_lua_manifest_kernelos(appid: str) -> tuple[Optional[str], Optional[
 
 
 
+
+
+
+        content_type = (dl_result.get('content_type') or '').lower()
+
+        # Handle ZIP files
+        if content_type.startswith('application/zip') or raw[:2] == b'PK':
+            try:
+                import zipfile
+                from io import BytesIO
+                with zipfile.ZipFile(BytesIO(raw), 'r') as zf:
+                    for name in zf.namelist():
+                        if name.lower().endswith('.lua'):
+                            lua_bytes = zf.read(name)
+                            return lua_bytes.decode('utf-8', errors='replace'), None
+                logger.log(f"SteamLua: No .lua file found in archive for {appid}")
+                return None, None
+            except zipfile.BadZipFile:
+                pass
+
+        # Handle plain lua content
+        try:
+            text = raw.decode('utf-8')
+        except UnicodeDecodeError:
+            text = raw.decode('utf-8', errors='replace')
+
+        if text.strip():
+            return text, None
+
+        logger.log(f"SteamLua: Empty content for {appid}")
+        return None, None
+
+    except Exception as exc:
+        logger.log(f"SteamLua: Error downloading manifest for {appid}: {exc}")
+        return None, None
+
 def download_lua_manifest_manilua(appid: str, api_key: str) -> tuple[Optional[str], Optional[int]]:
     try:
         client = get_global_client()

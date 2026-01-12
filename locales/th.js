@@ -75,6 +75,7 @@ const th = {
     ryuu: "Ryuu",
     maniluaUnderConstruction: "Manilua API (อยู่ระหว่างพัฒนา)",
     maniluaDisabled: "",
+    kernelos: "KernelOS",
   },
   auth: {
     title: "คีย์ API ของ Manilua",
