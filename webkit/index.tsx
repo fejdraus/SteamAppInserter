@@ -212,41 +212,65 @@ const analyzeCompatibility = (): CompatInfo => {
     const { tags, specs, noticesText } = kerneluaCollectStructured();
 
     const ONLINE = [
-        // English
+        // English (en)
         'online pvp', 'online co-op', 'co-op online', 'multiplayer online',
         'massively multiplayer', 'mmo', 'mmorpg', 'cross-platform multiplayer',
         'crossplay', 'cross-play', 'requires internet connection', 'always online',
         'live service', 'games as a service', 'pvp', 'multiplayer',
-        // Ukrainian
+        // Ukrainian (uk)
         'багатокористувацька', 'гравець проти гравця', 'гравець проти оточення',
         'мережева гра', 'кооператив',
-        // German
+        // German (de)
         'online-koop', 'mehrspieler', 'plattformübergreifender mehrspieler', 'koop',
-        // French
+        // French (fr)
         'coop en ligne', 'multijoueur', 'jcj',
-        // Spanish
-        'cooperativos en línea', 'cooperativo en línea', 'multijugador', 'jcj',
-        // Italian
+        // Spanish (es, es-419)
+        'cooperativos en línea', 'cooperativo en línea', 'multijugador',
+        // Italian (it)
         'co-op online', 'multigiocatore',
-        // Portuguese (Brazilian)
+        // Portuguese Brazilian (pt-BR)
         'cooperativo on-line', 'multijogador', 'jogador x jogador',
-        // Polish
+        // Portuguese European (pt)
+        'co-op online', 'baseado em equipas',
+        // Polish (pl)
         'sieciowa kooperacja', 'kooperacja', 'wieloosobowe', 'wieloosobowa',
-        // Turkish
+        // Turkish (tr)
         'çok oyunculu', 'çevrimiçi eşli oyun', 'eşli',
-        // Czech
+        // Czech (cs)
         'pro více hráčů', 'online kooperativní', 'kooperativní',
-        // Hungarian
+        // Hungarian (hu)
         'többjátékos', 'online együttműködő', 'együttműködő',
-        // Japanese
+        // Dutch (nl)
+        'onlineco-op',
+        // Danish (da)
+        'online co-op', 'holdbaseret',
+        // Swedish (sv)
+        'co-op online', 'lagbaserat',
+        // Finnish (fi)
+        'moninpeli', 'verkkoyhteistyöpeli', 'yhteistyö',
+        // Norwegian (no)
+        'flerspiller', 'samarbeid på nett', 'samarbeid', 'lagbasert',
+        // Romanian (ro)
+        'mai mulți jucători', 'cooperativ online', 'cooperativ',
+        // Bulgarian (bg)
+        'мрежови', 'кооперативни на линия', 'кооперативни', 'играч срещу играч',
+        // Greek (el)
+        'πολλών παικτών', 'διαδικτυακό συνεργατικό', 'συνεργατικό',
+        // Arabic (ar)
+        'اللعب الجماعي', 'تعاون عبر الإنترنت', 'تعاون', 'لاعب ضد لاعب',
+        // Thai (th)
+        'ผู้เล่นหลายคน', 'เล่นแบบร่วมมือกันออนไลน์', 'เล่นแบบร่วมมือกัน',
+        // Vietnamese (vi)
+        'chơi nhiều người', 'phối hợp trên mạng', 'phối hợp',
+        // Japanese (ja)
         'マルチプレイヤー', 'オンライン協力プレイ', '協力プレイ', '対戦',
         'クロスプラットフォームマルチプレイヤー',
-        // Korean
+        // Korean (ko)
         '멀티플레이어', '온라인 협동', '협동', '크로스 플랫폼 멀티플레이어',
-        // Simplified Chinese
+        // Simplified Chinese (zh-CN)
         '多人', '在线合作', '玩家对战', '跨平台多人',
-        // Traditional Chinese
-        '多人', '線上合作', '玩家對戰', '跨平台多人'
+        // Traditional Chinese (zh-TW)
+        '線上合作', '玩家對戰', '跨平台多人'
     ];
 
     const inList = (list: string[], terms: string[]): boolean =>
