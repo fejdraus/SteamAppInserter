@@ -216,50 +216,37 @@ const analyzeCompatibility = (): CompatInfo => {
         'online pvp', 'online co-op', 'co-op online', 'multiplayer online',
         'massively multiplayer', 'mmo', 'mmorpg', 'cross-platform multiplayer',
         'crossplay', 'cross-play', 'requires internet connection', 'always online',
-        'live service', 'games as a service',
+        'live service', 'games as a service', 'pvp', 'multiplayer',
         // Ukrainian
         'багатокористувацька', 'гравець проти гравця', 'гравець проти оточення',
         'мережева гра', 'кооператив',
         // German
-        'online-pvp', 'online-koop', 'mehrspieler', 'massively multiplayer',
-        'plattformübergreifender mehrspieler', 'koop',
+        'online-koop', 'mehrspieler', 'plattformübergreifender mehrspieler', 'koop',
         // French
-        'pvp en ligne', 'coop en ligne', 'multijoueur', 'multijoueur en ligne',
-        'multijoueur de masse', 'multijoueur multiplateforme',
+        'coop en ligne', 'multijoueur', 'jcj',
         // Spanish
-        'pvp en línea', 'cooperativo en línea', 'multijugador', 'multijugador en línea',
-        'multijugador masivo', 'multijugador multiplataforma',
+        'cooperativos en línea', 'cooperativo en línea', 'multijugador', 'jcj',
         // Italian
-        'pvp online', 'co-op online', 'multigiocatore', 'multigiocatore online',
-        'multigiocatore di massa', 'multigiocatore multipiattaforma',
+        'co-op online', 'multigiocatore',
         // Portuguese (Brazilian)
-        'pvp online', 'cooperativo online', 'multijogador', 'multijogadores',
-        'multijogador online', 'multijogador massivo', 'multijogador multiplataforma',
+        'cooperativo on-line', 'multijogador', 'jogador x jogador',
         // Polish
-        'pvp online', 'kooperacja online', 'wieloosobowa', 'wieloosobowy',
-        'sieciowa gra wieloosobowa', 'mmo', 'wieloosobowa międzyplatformowa',
-        // Dutch
-        'online pvp', 'online co-op', 'multiplayer', 'online multiplayer',
-        'massale multiplayer', 'cross-platform multiplayer',
+        'sieciowa kooperacja', 'kooperacja', 'wieloosobowe', 'wieloosobowa',
         // Turkish
-        'çevrimiçi pvp', 'çevrimiçi co-op', 'çok oyunculu', 'çevrimiçi çok oyunculu',
-        'devasa çok oyunculu', 'platformlar arası çok oyunculu',
+        'çok oyunculu', 'çevrimiçi eşli oyun', 'eşli',
         // Czech
-        'online pvp', 'online co-op', 'více hráčů', 'online více hráčů',
-        'mmo', 'více hráčů napříč platformami',
+        'pro více hráčů', 'online kooperativní', 'kooperativní',
         // Hungarian
-        'online pvp', 'online co-op', 'többjátékos', 'online többjátékos',
-        'tömeges többjátékos', 'platformok közötti többjátékos',
+        'többjátékos', 'online együttműködő', 'együttműködő',
         // Japanese
-        'オンライン対戦', 'オンライン協力', 'マルチプレイヤー', 'オンラインマルチプレイヤー',
-        'mmo', 'クロスプラットフォーム',
+        'マルチプレイヤー', 'オンライン協力プレイ', '協力プレイ', '対戦',
+        'クロスプラットフォームマルチプレイヤー',
         // Korean
-        '온라인 pvp', '온라인 협동', '멀티플레이어', '온라인 멀티플레이어',
-        'mmo', '크로스 플랫폼',
+        '멀티플레이어', '온라인 협동', '협동', '크로스 플랫폼 멀티플레이어',
         // Simplified Chinese
-        '在线pvp', '在线合作', '多人', '在线多人', '大型多人', '跨平台多人',
+        '多人', '在线合作', '玩家对战', '跨平台多人',
         // Traditional Chinese
-        '線上pvp', '線上合作', '多人', '線上多人', '大型多人', '跨平台多人'
+        '多人', '線上合作', '玩家對戰', '跨平台多人'
     ];
 
     const inList = (list: string[], terms: string[]): boolean =>
