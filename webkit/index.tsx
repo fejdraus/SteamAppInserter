@@ -59,14 +59,59 @@ type CompatInfo = {
 const COMPAT_BADGE_ID = 'steam-app-inserter-compat-badge';
 
 const DRM_TERMS = [
+    // Brand names (universal)
     'denuvo', 'securom', 'secucrom', 'arxan', 'vmprotect',
-    'requires 3rd-party drm', 'third-party drm'
+    // English
+    'requires 3rd-party drm', 'third-party drm', '3rd-party drm',
+    // German
+    'drittanbieter-drm',
+    // French
+    'drm tiers', 'gestion des droits numériques tiers',
+    // Spanish
+    'drm de terceros',
+    // Italian
+    'drm di terze parti',
+    // Portuguese
+    'drm de terceiros',
+    // Polish
+    'drm innego producenta', 'system drm innego producenta',
+    // Ukrainian
+    'стороння система захисту', 'drm стороннього виробника',
+    // Japanese
+    'サードパーティーのdrm',
+    // Korean
+    '타사 drm',
+    // Chinese
+    '第三方 drm', '第三方drm'
 ];
 
 const ACCOUNT_TERMS = [
-    'requires 3rd-party account', '3rd-party account', 'ea account', 'ea app',
-    'ea play', 'ubisoft connect', 'uplay', 'rockstar social club', 'rockstar games launcher',
-    'battle.net', 'bethesda.net', '2k account', 'epic account', 'riot account'
+    // Brand names (universal) - these don't change across languages
+    'ea account', 'ea app', 'ea play', 'ubisoft connect', 'uplay',
+    'rockstar social club', 'rockstar games launcher', 'battle.net',
+    'bethesda.net', '2k account', 'epic account', 'riot account',
+    // English
+    'requires 3rd-party account', '3rd-party account', 'third-party account',
+    // German
+    'drittanbieteraccount', 'drittanbieter-account', 'konto eines drittanbieters',
+    // French
+    'compte tiers', 'nécessite un compte tiers',
+    // Spanish
+    'cuenta de terceros', 'requiere cuenta de terceros',
+    // Italian
+    'account di terze parti',
+    // Portuguese
+    'conta de terceiros',
+    // Polish
+    'konto na platformie firmy zewnętrznej', 'konto firmy trzeciej',
+    // Ukrainian
+    'обліковий запис сторонньої компанії', 'сторонній обліковий запис',
+    // Japanese
+    'サードパーティーのアカウント',
+    // Korean
+    '타사 계정',
+    // Chinese
+    '第三方帐户', '第三方账户'
 ];
 
 const ensureCompatStyles = (): void => {
