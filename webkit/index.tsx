@@ -58,15 +58,6 @@ type CompatInfo = {
 
 const COMPAT_BADGE_ID = 'steam-app-inserter-compat-badge';
 
-const ONLINE_TERMS = [
-    'online pvp', 'online co-op', 'co-op online', 'multiplayer online',
-    'massively multiplayer', 'mmo', 'mmorpg', 'cross-platform multiplayer',
-    'crossplay', 'cross-play', 'pvp', 'requires internet connection',
-    'always online', 'live service', 'games as a service'
-];
-
-const SINGLE_PLAYER_TERMS = ['single-player', 'single player', 'singleplayer'];
-
 const DRM_TERMS = [
     'denuvo', 'securom', 'secucrom', 'arxan', 'vmprotect',
     'requires 3rd-party drm', 'third-party drm'
@@ -180,37 +171,64 @@ const ensureCompatStyles = (): void => {
     document.head.appendChild(style);
 };
 
-const normalizeText = (s: string): string => {
+// Exact copy of kernelua normalization
+const norm = (s: string): string => {
     try {
-        return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        return (s || '').toString().normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
     } catch {
-        return s.toLowerCase().trim();
+        return (s || '').toString().toLowerCase();
     }
 };
 
-const collectPageData = (): { tags: string[]; specs: string[]; notices: string } => {
-    const tagNodes = document.querySelectorAll('.glance_tags .app_tag, .popular_tags .app_tag');
-    const specNodes = document.querySelectorAll('.game_area_details_specs a.name, .game_area_details_specs li');
-    const noticeNodes = document.querySelectorAll('.DRM_notice, .game_area_sys_req, .game_area_description');
-
-    const tags = Array.from(tagNodes).map(n => normalizeText(n.textContent || ''));
-    const specs = Array.from(specNodes).map(n => normalizeText(n.textContent || ''));
-    const notices = normalizeText(Array.from(noticeNodes).map(n => n.textContent || '').join(' '));
-
-    return { tags, specs, notices };
+const uniqueNormList = (list: string[]): string[] => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const x of list) {
+        const n = norm(x).trim();
+        if (!n) continue;
+        if (!seen.has(n)) {
+            seen.add(n);
+            out.push(n);
+        }
+    }
+    return out;
 };
 
+// Exact copy of kernelua collection (with same selectors)
+const kerneluaCollectStructured = (): { tags: string[]; specs: string[]; noticesText: string } => {
+    const tagNodes = document.querySelectorAll('.glance_tags .app_tag, .popular_tags .app_tag, #category_block a, #category_block .label');
+    const specNodes = document.querySelectorAll('.game_area_details_specs a, .game_area_details_specs li, .game_area_features_list li');
+    const noticeNodes = document.querySelectorAll('.DRM_notice, .game_meta_data, .glance_ctn, .game_area_purchase');
+
+    const tags = uniqueNormList(Array.from(tagNodes).map(n => n.textContent || ''));
+    const specs = uniqueNormList(Array.from(specNodes).map(n => n.textContent || ''));
+    const noticesText = norm(Array.from(noticeNodes).map(n => n.textContent || '').join(' \n '));
+
+    return { tags, specs, noticesText };
+};
+
+// Analysis with debug output
 const analyzeCompatibility = (): CompatInfo => {
-    const { tags, specs, notices } = collectPageData();
-    const allText = [...tags, ...specs].join(' ') + ' ' + notices;
+    const { tags, specs, noticesText } = kerneluaCollectStructured();
 
-    const hasMatch = (terms: string[]): boolean =>
-        terms.some(term => allText.includes(term));
+    const ONLINE = [
+        // English
+        'online pvp', 'online co-op', 'co-op online', 'multiplayer online',
+        'massively multiplayer', 'mmo', 'mmorpg', 'cross-platform multiplayer',
+        'crossplay', 'cross-play', 'requires internet connection', 'always online',
+        'live service', 'games as a service',
+        // Ukrainian
+        'багатокористувацька', 'гравець проти гравця', 'гравець проти оточення',
+        'мережева гра', 'кооператив'
+    ];
 
-    const hasOnline = hasMatch(ONLINE_TERMS);
-    const hasSingle = hasMatch(SINGLE_PLAYER_TERMS);
-    const hasDrm = hasMatch(DRM_TERMS);
-    const hasAccount = hasMatch(ACCOUNT_TERMS);
+    const inList = (list: string[], terms: string[]): boolean =>
+        list.some(x => terms.some(t => x.includes(t)));
+
+    const hasOnline = inList(tags, ONLINE) || inList(specs, ONLINE);
+    const hasDrm = DRM_TERMS.some(t => noticesText.includes(t));
+    const hasAccount = ACCOUNT_TERMS.some(t => noticesText.includes(t)) ||
+                       inList(tags, ACCOUNT_TERMS) || inList(specs, ACCOUNT_TERMS);
 
     let level: CompatLevel = 'ok';
     const reasons: string[] = [];
@@ -225,11 +243,8 @@ const analyzeCompatibility = (): CompatInfo => {
         reasons.push(t('compat.accountRequired'));
     }
 
-    if (hasOnline && !hasSingle) {
+    if (hasOnline) {
         if (level !== 'bad') level = 'warn';
-        reasons.push(t('compat.onlineOnly'));
-    } else if (hasOnline && hasSingle) {
-        if (level === 'ok') level = 'warn';
         reasons.push(t('compat.hasOnline'));
     }
 

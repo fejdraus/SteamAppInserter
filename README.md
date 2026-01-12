@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -47,10 +47,20 @@ This plugin is part of a three-component system:
 
 ### 🔧 Advanced Features
 
-- **Multiple Mirror Support** - Automatically tries multiple sources for manifest files
+- **Multiple Mirror Support** - Choose between ManifestHub (default) and KernelOS mirrors
 - **Error Handling** - Clear error messages if manifests aren't available
 - **Automatic Processing** - Processes manifests with SteamTools-compatible logic
 - **One-Click Restart** - Optional Steam restart prompt after adding games
+
+### 🎯 Compatibility Badge
+
+- **Visual Indicator** - Shows game compatibility status directly on store pages
+- **Smart Detection** - Automatically detects online-only games, DRM, and third-party account requirements
+- **Multi-language** - Works with English and Ukrainian Steam interfaces
+- **Color Coding:**
+  - 🟢 **Green** - Game should work fine (single-player, no DRM)
+  - 🟡 **Yellow** - May have issues (online features, third-party accounts)
+  - 🔴 **Red** - Requires bypass (DRM detected)
 
 ---
 
@@ -164,28 +174,18 @@ This plugin is part of a three-component system:
 
 The plugin supports **two sources** for downloading manifests:
 
-#### Public Mirrors (Default)
+#### ManifestHub (Default)
 
 - Primary: `https://raw.githubusercontent.com/SteamAutoCracks/ManifestHub/`
 - Fallback: `https://cdn.jsdmirror.com/gh/SteamAutoCracks/ManifestHub/`
 - **No authentication required**
+- Large collection of game manifests
 
-#### Manilua Mirror (Advanced)
+#### KernelOS
 
-- URL: `https://manilua.golde.org/`
-- **Requires API token** for enhanced compatibility
-- Access to private/locked games and extra DLC
-
-#### Getting Manilua API Token
-
-1. **Visit** the external service: https://www.piracybound.com/manilua
-2. **Authorize** through **Discord login**
-3. **Go to Profile Settings**
-4. **API Keys** section - click **"Generate Key"**
-5. **Copy** the generated token (starts with `manilua_`)
-6. **In the plugin:** Select "Manilua (Advanced)" mirror and paste the token when prompted
-
-> **Note:** Manilua token is optional but unlocks access to more games and DLC not available in public mirrors.
+- URL: `https://kernelos.org/`
+- **No authentication required**
+- Alternative source with different game coverage
 
 ---
 
