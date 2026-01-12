@@ -67,7 +67,7 @@ class HTTPClient:
             raise Exception("Neither httpx nor requests library is available. Please install at least one: pip install httpx or pip install requests")
 
         if not HTTPX_AVAILABLE:
-            logger.warn("httpx not available, falling back to requests library")
+            logger.info("httpx not available, using requests library")
 
     def _ensure_client(self):
         """Ensure HTTP client is initialized (only for httpx)."""
