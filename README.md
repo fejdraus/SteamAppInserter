@@ -141,26 +141,26 @@ This plugin is part of a three-component system:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  1. You visit a Steam Store page                          │
+│  1. You visit a Steam Store page                            │
 │     ↓                                                       │
-│  2. Plugin injects "Add to library" button                │
+│  2. Plugin injects "Add to library" button                  │
 │     ↓                                                       │
-│  3. You click the button and select DLC                   │
+│  3. You click the button and select DLC                     │
 │     ↓                                                       │
-│  4. Plugin downloads .lua manifest from public mirrors     │
+│  4. Plugin downloads .lua manifest from public mirrors      │
 │     ↓                                                       │
-│  5. Plugin processes manifest (removes setManifestid,     │
-│     adds decryption keys)                                  │
+│  5. Plugin processes manifest (removes setManifestid,       │
+│     adds decryption keys)                                   │
 │     ↓                                                       │
-│  6. Plugin saves to Steam/config/stplug-in/{appid}.lua    │
+│  6. Plugin saves to Steam/config/stplug-in/{appid}.lua      │
 │     ↓                                                       │
-│  7. You restart Steam                                      │
+│  7. You restart Steam                                       │
 │     ↓                                                       │
-│  8. SteamTools reads the .lua file                        │
+│  8. SteamTools reads the .lua file                          │
 │     ↓                                                       │
-│  9. SteamTools unlocks the game in Steam                  │
+│  9. SteamTools unlocks the game in Steam                    │
 │     ↓                                                       │
-│ 10. Game appears in your library! 🎉                      │
+│ 10. Game appears in your library!                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
