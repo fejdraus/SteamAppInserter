@@ -115,6 +115,15 @@ const vi = {
     validationRequestFailed: "Yêu cầu xác thực thất bại với HTTP {status}.",
     validationException: "Xác thực khóa API thất bại: {error}",
   },
+  compat: {
+    works: "Hoạt động",
+    mayNotWork: "Có thể không hoạt động",
+    needsBypass: "Cần bypass",
+    drmDetected: "Phát hiện DRM (Denuvo, v.v.)",
+    accountRequired: "Cần tài khoản bên thứ ba",
+    onlineOnly: "Chỉ trực tuyến",
+    hasOnline: "Có tính năng trực tuyến",
+  },
 };
 
 export default vi;

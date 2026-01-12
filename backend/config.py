@@ -28,8 +28,9 @@ MANIFEST_URLS = (
 
 STEAMUI_APPINFO = "https://store.steampowered.com/api/appdetails?appids={appid}&cc=en"
 
-# Ryuu mirror URL
-RYUU_DOWNLOAD_URL = "https://generator.ryuu.lol/api/download"
+# KernelOS API Configuration (no auth required)
+KERNELOS_API_BASE = 'https://kernelos.org'
+KERNELOS_DOWNLOAD_URL = f'{KERNELOS_API_BASE}/games/download.php?gen=1&id={{appid}}'
 
 # User Agent (fallback when Steam verification is not available)
 USER_AGENT = f'manilua-plugin/{VERSION} (Millennium)'

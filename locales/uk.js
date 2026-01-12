@@ -122,6 +122,15 @@ const uk = {
     manifestNotFoundRyuu: "Маніфест для {name} ({appid}) не знайдено на дзеркалі Ryuu.",
     manifestNotFoundRyuuNoName: "Маніфест для {appid} не знайдено на дзеркалі Ryuu.",
   },
+  compat: {
+    works: "Працює",
+    mayNotWork: "Може не працювати",
+    needsBypass: "Потрібен обхід",
+    drmDetected: "Виявлено DRM (Denuvo та ін.)",
+    accountRequired: "Потрібен сторонній акаунт",
+    onlineOnly: "Тільки онлайн",
+    hasOnline: "Є онлайн-функції",
+  },
 };
 
 export default uk;

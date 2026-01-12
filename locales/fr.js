@@ -116,6 +116,15 @@ const fr = {
     validationRequestFailed: "La demande de validation a échoué avec HTTP {status}.",
     validationException: "La validation de la clé API a échoué : {error}",
   },
+  compat: {
+    works: "Fonctionne",
+    mayNotWork: "Peut ne pas fonctionner",
+    needsBypass: "Contournement nécessaire",
+    drmDetected: "DRM détecté (Denuvo, etc.)",
+    accountRequired: "Compte tiers requis",
+    onlineOnly: "En ligne uniquement",
+    hasOnline: "Fonctionnalités en ligne",
+  },
 };
 
 export default fr;

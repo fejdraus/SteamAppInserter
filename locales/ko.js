@@ -115,6 +115,15 @@ const ko = {
     validationRequestFailed: "검증 요청이 HTTP {status}로 실패했습니다.",
     validationException: "API 키 검증 실패: {error}",
   },
+  compat: {
+    works: "작동함",
+    mayNotWork: "작동하지 않을 수 있음",
+    needsBypass: "우회 필요",
+    drmDetected: "DRM 감지됨 (Denuvo 등)",
+    accountRequired: "타사 계정 필요",
+    onlineOnly: "온라인 전용",
+    hasOnline: "온라인 기능 있음",
+  },
 };
 
 export default ko;

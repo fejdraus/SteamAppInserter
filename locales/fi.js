@@ -115,6 +115,15 @@ const fi = {
     validationRequestFailed: "Vahvistuspyyntö epäonnistui HTTP {status}:lla.",
     validationException: "API-avaimen vahvistus epäonnistui: {error}",
   },
+  compat: {
+    works: "Toimii",
+    mayNotWork: "Ei ehkä toimi",
+    needsBypass: "Ohitus tarvitaan",
+    drmDetected: "DRM havaittu (Denuvo, jne.)",
+    accountRequired: "Kolmannen osapuolen tili vaaditaan",
+    onlineOnly: "Vain verkossa",
+    hasOnline: "Sisältää verkko-ominaisuuksia",
+  },
 };
 
 export default fi;

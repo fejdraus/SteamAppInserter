@@ -115,6 +115,15 @@ const ja = {
     validationRequestFailed: "検証リクエストが HTTP {status} で失敗しました。",
     validationException: "API キーの検証に失敗しました: {error}",
   },
+  compat: {
+    works: "動作します",
+    mayNotWork: "動作しない可能性",
+    needsBypass: "バイパスが必要",
+    drmDetected: "DRM検出 (Denuvoなど)",
+    accountRequired: "サードパーティアカウントが必要",
+    onlineOnly: "オンライン専用",
+    hasOnline: "オンライン機能あり",
+  },
 };
 
 export default ja;

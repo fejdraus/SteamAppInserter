@@ -115,6 +115,15 @@ const da = {
     validationRequestFailed: "Valideringsanmodning fejlede med HTTP {status}.",
     validationException: "Validering af API-nøgle fejlede: {error}",
   },
+  compat: {
+    works: "Virker",
+    mayNotWork: "Virker måske ikke",
+    needsBypass: "Bypass påkrævet",
+    drmDetected: "DRM registreret (Denuvo, osv.)",
+    accountRequired: "Tredjepartskonto påkrævet",
+    onlineOnly: "Kun online",
+    hasOnline: "Har onlinefunktioner",
+  },
 };
 
 export default da;

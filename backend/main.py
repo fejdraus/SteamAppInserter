@@ -17,7 +17,8 @@ from config import (
     CACHE_EXPIRY_SECONDS,
     MANIFEST_URLS,
     STEAMUI_APPINFO,
-    RYUU_DOWNLOAD_URL,
+    KERNELOS_API_BASE,
+    KERNELOS_DOWNLOAD_URL,
 )
 
 try:
@@ -128,7 +129,7 @@ except Exception:
         return None
 
 
-MIRROR_NAMES = {'default': 'ManifestHub', 'manilua': 'Manilua', 'ryuu': 'Ryuu'}
+MIRROR_NAMES = {'default': 'ManifestHub', 'manilua': 'Manilua', 'kernelos': 'KernelOS'}
 _cache: dict[str, tuple[Any, float]] = {}
 
 
@@ -328,8 +329,8 @@ def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]
     return result
 
 
-def _extract_ryuu_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]:
-    """Extract Ryuu archive (ZIP with .lua and .manifest files)."""
+def _extract_kernelos_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]:
+    """Extract KernelOS archive (ZIP with .lua and .manifest files)."""
     result: dict[str, Any] = {
         'success': False,
         'lua_content': None,
@@ -340,7 +341,7 @@ def _extract_ryuu_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]:
     try:
         with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
             file_list = archive.namelist()
-            logger.log(f"Ryuu archive for {appid} contains {len(file_list)} files: {file_list}")
+            logger.log(f"KernelOS archive for {appid} contains {len(file_list)} files: {file_list}")
 
             stplug_in_dir = get_stplug_in_path()
             depotcache_dir = get_depotcache_path()
@@ -379,68 +380,110 @@ def _extract_ryuu_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]:
                         logger.log(f"Extracted {file_name} → {dest_path}")
 
                     else:
-                        logger.log(f"Skipping unknown file type in Ryuu archive: {file_name}")
+                        logger.log(f"Skipping unknown file type in KernelOS archive: {file_name}")
 
                 except Exception as exc:
                     logger.error(f"Failed to extract {file_name}: {exc}")
                     continue
 
             if not lua_files_found:
-                result['error'] = "No .lua files found in Ryuu archive"
-                logger.log(f"Ryuu archive for {appid} did not contain any .lua files")
+                result['error'] = "No .lua files found in KernelOS archive"
+                logger.log(f"KernelOS archive for {appid} did not contain any .lua files")
                 return result
 
             result['lua_content'] = lua_files_found[0]
             result['success'] = True
-            logger.log(f"Successfully extracted {len(result['installed_files'])} files from Ryuu archive for {appid}")
+            logger.log(f"Successfully extracted {len(result['installed_files'])} files from KernelOS archive for {appid}")
 
     except zipfile.BadZipFile as exc:
         result['error'] = f"Invalid ZIP file: {exc}"
-        logger.error(f"Ryuu archive for {appid} is not a valid ZIP: {exc}")
+        logger.error(f"KernelOS archive for {appid} is not a valid ZIP: {exc}")
     except Exception as exc:
         result['error'] = f"Failed to extract archive: {exc}"
-        logger.error(f"Failed to process Ryuu archive for {appid}: {exc}")
+        logger.error(f"Failed to process KernelOS archive for {appid}: {exc}")
 
     return result
 
 
-def download_lua_manifest_ryuu(appid: str) -> tuple[Optional[str], Optional[int]]:
-    """Download manifest from Ryuu API (no auth required)."""
+def download_lua_manifest_kernelos(appid: str) -> tuple[Optional[str], Optional[int]]:
+    """Download lua manifest from KernelOS mirror (no auth required)."""
     try:
-        url = f"{RYUU_DOWNLOAD_URL}/{appid}"
-        logger.log(f"Downloading from Ryuu API: {url}")
+        client = get_global_client()
 
-        headers = {"User-Agent": "RyuuManifestToolV2/1.0"}
-        response = requests.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+        # Step 1: Get signed download URL
+        gen_url = KERNELOS_DOWNLOAD_URL.format(appid=appid)
+        logger.log(f"KernelOS: Requesting signed URL for {appid}")
 
-        if response.status_code == 404:
-            logger.log(f"Game {appid} not found on Ryuu mirror.")
-            return None, 404
+        gen_result = client.get(gen_url)
+        if not gen_result.get('success'):
+            logger.log(f"KernelOS: Failed to get signed URL for {appid}: {gen_result.get('error')}")
+            return None, gen_result.get('status_code')
 
-        if response.status_code != 200:
-            logger.log(f"Ryuu mirror returned HTTP {response.status_code} for {appid}")
-            return None, response.status_code
-
-        content_type = (response.headers.get("Content-Type") or "").lower()
-        raw = response.content
-
-        if content_type.startswith("application/zip") or raw[:2] == b"PK":
-            extract_result = _extract_ryuu_archive(appid, raw)
-            if extract_result['success']:
-                return extract_result['lua_content'], None
-            else:
-                logger.log(f"Ryuu archive extraction failed: {extract_result.get('error', 'Unknown error')}")
+        gen_data = gen_result.get('data')
+        if isinstance(gen_data, (bytes, bytearray)):
+            gen_data = gen_data.decode('utf-8', errors='replace')
+        if isinstance(gen_data, str):
+            try:
+                gen_data = json.loads(gen_data)
+            except json.JSONDecodeError:
+                logger.log(f"KernelOS: Invalid JSON response for {appid}")
                 return None, None
 
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            text = raw.decode("utf-8", errors="replace")
+        if not isinstance(gen_data, dict) or 'url' not in gen_data:
+            logger.log(f"KernelOS: No download URL in response for {appid}")
+            return None, None
 
-        return text if text.strip() else None, None
-    except Exception as exc:
-        logger.log(f"Failed to download manifest from Ryuu mirror for {appid}: {exc}")
+        download_url = gen_data['url']
+        if isinstance(download_url, str) and download_url.startswith('/'):
+            download_url = KERNELOS_API_BASE + download_url
+
+        logger.log(f"KernelOS: Downloading from {download_url}")
+
+        # Step 2: Download the actual file
+        dl_result = client.get_binary(download_url)
+        if not dl_result.get('success'):
+            status_code = dl_result.get('status_code')
+            logger.log(f"KernelOS: Download failed for {appid}: HTTP {status_code}")
+            return None, status_code
+
+        raw = dl_result['data']
+        if not raw:
+            logger.log(f"KernelOS: Empty response for {appid}")
+            return None, None
+
+        content_type = (dl_result.get('content_type') or '').lower()
+
+        # Handle ZIP files
+        if content_type.startswith('application/zip') or raw[:2] == b'PK':
+            try:
+                import zipfile
+                from io import BytesIO
+                with zipfile.ZipFile(BytesIO(raw), 'r') as zf:
+                    for name in zf.namelist():
+                        if name.lower().endswith('.lua'):
+                            lua_bytes = zf.read(name)
+                            return lua_bytes.decode('utf-8', errors='replace'), None
+                logger.log(f"KernelOS: No .lua file found in archive for {appid}")
+                return None, None
+            except zipfile.BadZipFile:
+                pass
+
+        # Handle plain lua content
+        try:
+            text = raw.decode('utf-8')
+        except UnicodeDecodeError:
+            text = raw.decode('utf-8', errors='replace')
+
+        if text.strip():
+            return text, None
+
+        logger.log(f"KernelOS: Empty content for {appid}")
         return None, None
+
+    except Exception as exc:
+        logger.log(f"KernelOS: Error downloading manifest for {appid}: {exc}")
+        return None, None
+
 
 
 def download_lua_manifest_manilua(appid: str, api_key: str) -> tuple[Optional[str], Optional[int]]:
@@ -581,8 +624,8 @@ def download_lua_manifest_text(appid: str, mirror: str = 'default') -> tuple[Opt
                 return text if text.strip() else None, None
         except Exception:
             return None, None
-    elif mirror == 'ryuu':
-        return download_lua_manifest_ryuu(appid)
+    elif mirror == 'kernelos':
+        return download_lua_manifest_kernelos(appid)
     else:
         content = _download_text(_build_manifest_urls(appid, '.lua'))
         return content, None
@@ -600,8 +643,8 @@ def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
             logger.log("Manilua mirror requested but API key is not configured.")
             return None
         result, _ = download_lua_manifest_manilua(appid, api_key)
-    elif mirror_key == 'ryuu':
-        result, _ = download_lua_manifest_ryuu(appid)
+    elif mirror_key == 'kernelos':
+        result, _ = download_lua_manifest_kernelos(appid)
     else:
         result = _download_text(_build_manifest_urls(appid, '.lua'))
 
@@ -662,7 +705,7 @@ def build_dlc_lua_from_manifest(manifest: dict[str, Any], dlc_appid: str) -> Opt
 def fetch_game_info(appid: str) -> Optional[dict[str, Any]]:
     url = STEAMUI_APPINFO.format(appid=appid)
     try:
-        headers = {"User-Agent": "RyuuManifestToolV2/1.0"}
+        headers = {"User-Agent": "KernelOSManifestToolV2/1.0"}
         response = requests.get(url, headers=headers, timeout=HTTP_TIMEOUT)
         if response.status_code != 200:
             logger.log(f"Steam API returned {response.status_code} for {appid}")
@@ -715,6 +758,11 @@ def get_manifest_path(appid: str) -> str:
 
 
 def clean_lua_content(content: str) -> str:
+    # Normalize line endings
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
+    while '\n\n' in content:
+        content = content.replace('\n\n', '\n')
+
     lines = content.split('\n')
     cleaned_lines = []
 
@@ -725,6 +773,13 @@ def clean_lua_content(content: str) -> str:
         r'--\s*provided\s+by',
         r'--\s*source:',
         r'^--\s*dlc\s*$',
+        # KernelOS patterns
+        r'^--\s*={3,}',
+        r'--\s*credits:',
+        r'--\s*discord:',
+        r'--\s*website:',
+        r'--\s*k3rn',
+        r'--\s*kernelos',
     ]
 
     for line in lines:
@@ -769,6 +824,13 @@ def remove_dlc_entries_from_content(content: str, dlcs_to_remove: set[str], main
     filtered_lines = []
     removed_dlc_ids: set[str] = set()
 
+    # First pass: find all IDs that have associated addtoken lines (depot entries)
+    token_ids: set[str] = set()
+    for line in lines:
+        match = re.search(r'addtoken\((\d+)', line)
+        if match:
+            token_ids.add(match.group(1))
+
     for line in lines:
         stripped = line.strip()
 
@@ -785,6 +847,11 @@ def remove_dlc_entries_from_content(content: str, dlcs_to_remove: set[str], main
                 found_id = match.group(1)
 
                 if found_id == main_appid:
+                    filtered_lines.append(line)
+                    continue
+
+                # Always keep depot entries (those with associated tokens)
+                if found_id in token_ids:
                     filtered_lines.append(line)
                     continue
 
@@ -808,7 +875,7 @@ def remove_dlc_entries_from_content(content: str, dlcs_to_remove: set[str], main
 
 
 def extract_keys_from_lua_content(content: str) -> dict[str, str]:
-    """Extract decryption keys from lua content (works with Ryuu format: addappid(id,0,"key"))."""
+    """Extract decryption keys from lua content (works with KernelOS format: addappid(id,0,"key"))."""
     keys: dict[str, str] = {}
     for match in re.finditer(r'addappid\(\s*(\d+)\s*,\s*\d+\s*,\s*"([^"]+)"\s*\)', content):
         appid = match.group(1)
@@ -819,7 +886,7 @@ def extract_keys_from_lua_content(content: str) -> dict[str, str]:
 
 
 def extract_manifest_ids_from_lua(content: str) -> dict[str, str]:
-    """Extract manifest IDs from lua content (Ryuu format: setManifestid(id,"manifestid"))."""
+    """Extract manifest IDs from lua content (KernelOS format: setManifestid(id,"manifestid"))."""
     manifest_ids: dict[str, str] = {}
     for match in re.finditer(r'setManifestid\(\s*(\d+)\s*,\s*"([^"]+)"\s*\)', content):
         appid = match.group(1)
@@ -840,7 +907,7 @@ def extract_all_appids_from_lua(content: str, main_appid: str) -> list[str]:
 
 
 def remove_all_dlc_entries(content: str, main_appid: str) -> str:
-    """Remove all addappid/setManifestid entries except the main app (for Ryuu format)."""
+    """Remove all addappid/setManifestid entries except the main app (for KernelOS format)."""
     lines = content.split('\n')
     filtered_lines = []
 
@@ -873,15 +940,15 @@ def fetch_dlc_decryption_keys(dlc_ids: list[str], main_appid: str, main_game_jso
     if not wanted:
         return keys
 
-    # For Ryuu mirror - extract keys directly from the lua file
-    if mirror == 'ryuu':
+    # For KernelOS mirror - extract keys directly from the lua file
+    if mirror == 'kernelos':
         try:
-            lua_content = download_lua_manifest(main_appid, 'ryuu')
+            lua_content = download_lua_manifest(main_appid, 'kernelos')
             if lua_content:
                 keys = extract_keys_from_lua_content(lua_content)
-                logger.log(f'fetch_dlc_decryption_keys: extracted {len(keys)} keys from Ryuu lua for {main_appid}')
+                logger.log(f'fetch_dlc_decryption_keys: extracted {len(keys)} keys from KernelOS lua for {main_appid}')
         except Exception as exc:
-            logger.log(f'fetch_dlc_decryption_keys: Ryuu lua parse failed for {main_appid}: {exc}')
+            logger.log(f'fetch_dlc_decryption_keys: KernelOS lua parse failed for {main_appid}: {exc}')
         return keys
 
     if mirror != 'manilua':
@@ -1044,29 +1111,16 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
     installed_dlc_ids = set()
     manilua_dlc_list: list[dict[str, Any]] = []
 
-    # For Ryuu - use Steam API DLC list but verify availability in Ryuu manifest
-    if mirror == 'ryuu':
-        logger.log(f"Fetching DLC list from Ryuu API for {appid}")
-        ryuu_content = download_lua_manifest(appid, 'ryuu')
-        if not ryuu_content:
-            logger.log(f"Failed to download Ryuu manifest for {appid}")
-            return []
+    # For KernelOS - use Steam API DLC list, get keys from KernelOS file
+    if mirror == 'kernelos':
+        logger.log(f"Fetching DLC list from Steam API for {appid}, keys from KernelOS")
 
-        # Extract data from Ryuu file
-        ryuu_all_appids = extract_all_appids_from_lua(ryuu_content, appid)
-        ryuu_keys = extract_keys_from_lua_content(ryuu_content)
-        logger.log(f"Ryuu manifest for {appid}: {len(ryuu_all_appids)} entries, {len(ryuu_keys)} keys")
-
-        # Get actual DLC list from Steam API (type = 'dlc')
-        steam_dlc_appids: set[str] = set()
-        for item in related:
-            if isinstance(item, dict):
-                steam_dlc_appids.add(str(item.get('appid', '')))
-        logger.log(f"Steam API DLC list: {len(steam_dlc_appids)} items")
-
-        # Only show DLC that are both in Steam API and in Ryuu file
-        valid_dlc_appids = steam_dlc_appids & set(ryuu_all_appids)
-        logger.log(f"Valid DLC (in both Steam and Ryuu): {len(valid_dlc_appids)} items")
+        # Get keys from KernelOS file
+        kernelos_content = download_lua_manifest(appid, 'kernelos')
+        kernelos_keys: dict[str, str] = {}
+        if kernelos_content:
+            kernelos_keys = extract_keys_from_lua_content(kernelos_content)
+            logger.log(f"KernelOS: extracted {len(kernelos_keys)} keys")
 
         # Check which DLC are already installed locally
         if os.path.isfile(main_file):
@@ -1080,31 +1134,36 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
             except Exception as e:
                 logger.log(f"Error reading {main_file}: {e}")
 
-        # Build candidates from valid DLC list only
+        # Build candidates from Steam API DLC list
         candidates: list[dict[str, Any]] = []
-        for dlc_appid in valid_dlc_appids:
-            # Get name from Steam API
-            dlc_name = f'DLC {dlc_appid}'
-            for item in related:
-                if isinstance(item, dict) and str(item.get('appid', '')) == dlc_appid:
-                    dlc_name = item.get('name') or dlc_name
-                    break
+        for item in related:
+            if not isinstance(item, dict):
+                continue
+            item_type = (item.get('type') or '').lower()
+            if item_type != 'dlc':
+                continue
 
+            dlc_appid = str(item.get('appid') or '').strip()
+            if not dlc_appid:
+                continue
+
+            dlc_name = item.get('name') or f'DLC {dlc_appid}'
             already_installed = dlc_appid in installed_dlc_ids
-            decryption_key = ryuu_keys.get(dlc_appid)
+            decryption_key = kernelos_keys.get(dlc_appid)
 
             candidate_data: dict[str, Any] = {
                 'appid': dlc_appid,
                 'name': dlc_name,
                 'alreadyInstalled': already_installed,
-                'source': 'ryuu'
+                'source': 'kernelos'
             }
             if decryption_key:
                 candidate_data['decryptionKey'] = decryption_key
 
             candidates.append(candidate_data)
-            logger.log(f"Ryuu DLC {dlc_appid} ({dlc_name}): alreadyInstalled={already_installed}, key={'present' if decryption_key else 'none'}")
+            logger.log(f"DLC {dlc_appid} ({dlc_name}): installed={already_installed}, key={'yes' if decryption_key else 'no'}")
 
+        logger.log(f"Total DLC candidates: {len(candidates)}")
         return candidates
 
     if mirror == 'manilua' and get_plugin().get_api_key():
@@ -1180,10 +1239,10 @@ def collect_dlc_candidates(appid: str, mirror: str = 'default') -> list[dict[str
     dlc_keys_map: dict[str, str] = {}
     if is_application:
         dlc_ids = [dlc_id for dlc_id, _ in dlc_items]
-        # For Ryuu - get keys from Ryuu manifest, for others - from JSON
-        if mirror == 'ryuu':
-            dlc_keys_map = fetch_dlc_decryption_keys(dlc_ids, appid, None, 'ryuu')
-            logger.log(f"Ryuu keys for {appid}: {len(dlc_keys_map)} keys found")
+        # For KernelOS - get keys from KernelOS manifest, for others - from JSON
+        if mirror == 'kernelos':
+            dlc_keys_map = fetch_dlc_decryption_keys(dlc_ids, appid, None, 'kernelos')
+            logger.log(f"KernelOS keys for {appid}: {len(dlc_keys_map)} keys found")
         else:
             dlc_keys_map = fetch_dlc_decryption_keys(dlc_ids, appid, main_game_json, mirror)
 
@@ -1636,9 +1695,9 @@ class Backend:
                     msg = create_message('backend.manifestNotAvailableManiluaNoName',
                                          f'Manifest for {appid} is not available via the Manilua mirror. Please verify your API key.',
                                          appid=appid)
-                elif mirror == 'ryuu':
-                    msg = create_message('backend.manifestNotAvailableRyuuNoName',
-                                         f'Manifest for {appid} is not available via the Ryuu mirror.',
+                elif mirror == 'kernelos':
+                    msg = create_message('backend.manifestNotAvailableKernelOSNoName',
+                                         f'Manifest for {appid} is not available via the KernelOS mirror.',
                                          appid=appid)
                 else:
                     msg = create_message('backend.manifestNotAvailablePublicNoName',
@@ -1647,9 +1706,9 @@ class Backend:
                 logger.log(msg['details'])
                 return {'success': False, **msg, 'installed': [], 'failed': requested}
 
-            # Ryuu already provides complete lua with keys, no processing needed
-            if mirror == 'ryuu':
-                logger.log(f'Using Ryuu lua content as-is for {appid}')
+            # KernelOS already provides complete lua with keys, no processing needed
+            if mirror == 'kernelos':
+                logger.log(f'Using KernelOS lua content as-is for {appid}')
             else:
                 json_data = download_json_manifest(appid)
                 if json_data:
@@ -1662,17 +1721,17 @@ class Backend:
         with open(base_game_path, 'r', encoding='utf-8') as handle:
             base_content = handle.read()
 
-        # For Ryuu - extract keys and manifest IDs from fresh download, metadata will be empty (no comments)
-        ryuu_keys: dict[str, str] = {}
-        ryuu_manifest_ids: dict[str, str] = {}
-        if mirror == 'ryuu':
-            logger.log(f'Extracting keys and manifest IDs from fresh Ryuu manifest for {appid}')
-            ryuu_fresh_content = download_lua_manifest(appid, 'ryuu')
-            if ryuu_fresh_content:
-                ryuu_keys = extract_keys_from_lua_content(ryuu_fresh_content)
-                ryuu_manifest_ids = extract_manifest_ids_from_lua(ryuu_fresh_content)
-                logger.log(f'Extracted {len(ryuu_keys)} keys and {len(ryuu_manifest_ids)} manifest IDs from Ryuu')
-            manilua_metadata = {}  # Ryuu has no comments/metadata
+        # For KernelOS - extract keys and manifest IDs from fresh download, metadata will be empty (no comments)
+        kernelos_keys: dict[str, str] = {}
+        kernelos_manifest_ids: dict[str, str] = {}
+        if mirror == 'kernelos':
+            logger.log(f'Extracting keys and manifest IDs from fresh KernelOS manifest for {appid}')
+            kernelos_fresh_content = download_lua_manifest(appid, 'kernelos')
+            if kernelos_fresh_content:
+                kernelos_keys = extract_keys_from_lua_content(kernelos_fresh_content)
+                kernelos_manifest_ids = extract_manifest_ids_from_lua(kernelos_fresh_content)
+                logger.log(f'Extracted {len(kernelos_keys)} keys and {len(kernelos_manifest_ids)} manifest IDs from KernelOS')
+            manilua_metadata = {}  # KernelOS has no comments/metadata
         elif mirror == 'manilua':
             logger.log(f'Extracting DLC metadata from fresh Manilua manifest for {appid}')
             manilua_fresh_content = download_lua_manifest(appid, 'manilua')
@@ -1699,14 +1758,14 @@ class Backend:
                         all_available_dlc.add(dlc_appid)
         dlc_keys_map = fetch_dlc_decryption_keys(requested, appid, None, mirror)
 
-        # For Ryuu - merge ryuu_keys into dlc_keys_map (ryuu_keys takes priority)
-        if mirror == 'ryuu' and ryuu_keys:
-            for k, v in ryuu_keys.items():
+        # For KernelOS - merge kernelos_keys into dlc_keys_map (kernelos_keys takes priority)
+        if mirror == 'kernelos' and kernelos_keys:
+            for k, v in kernelos_keys.items():
                 if k not in dlc_keys_map:
                     dlc_keys_map[k] = v
 
-        # For Ryuu - smart merge: keep depot lines, manage only actual DLC lines
-        if mirror == 'ryuu':
+        # For KernelOS - smart merge: keep depot lines, manage only actual DLC lines
+        if mirror == 'kernelos':
             # Known DLC = only from Steam API (actual DLC, not depots)
             known_dlc_appids: set[str] = set(all_available_dlc)
             logger.log(f'Steam API DLC appids: {known_dlc_appids}')
@@ -1714,8 +1773,8 @@ class Backend:
 
             # Identify depot entries (have key in addappid AND setManifestid)
             depot_appids: set[str] = set()
-            for app_id in ryuu_keys:
-                if app_id in ryuu_manifest_ids and app_id != appid:
+            for app_id in kernelos_keys:
+                if app_id in kernelos_manifest_ids and app_id != appid:
                     depot_appids.add(app_id)
             logger.log(f'Depot appids (have key + manifest): {len(depot_appids)} entries')
 
@@ -1796,7 +1855,7 @@ class Backend:
                 else:
                     dlc_lines.append(f'addappid({dlc_appid}) -- {dlc_name}')
 
-                manifest_id = ryuu_manifest_ids.get(dlc_appid, '').strip()
+                manifest_id = kernelos_manifest_ids.get(dlc_appid, '').strip()
                 if manifest_id:
                     dlc_lines.append(f'setManifestid({dlc_appid},"{manifest_id}")')
 

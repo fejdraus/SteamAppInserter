@@ -115,6 +115,15 @@ const cs = {
     validationRequestFailed: "Žádost o ověření selhala s HTTP {status}.",
     validationException: "Ověření API klíče selhalo: {error}",
   },
+  compat: {
+    works: "Funguje",
+    mayNotWork: "Nemusí fungovat",
+    needsBypass: "Vyžaduje obejití",
+    drmDetected: "Detekován DRM (Denuvo atd.)",
+    accountRequired: "Vyžaduje účet třetí strany",
+    onlineOnly: "Pouze online",
+    hasOnline: "Obsahuje online funkce",
+  },
 };
 
 export default cs;

@@ -115,6 +115,15 @@ const ar = {
     validationRequestFailed: "فشلت إرسال التحقق بـ HTTP {status}.",
     validationException: "فشل التحقق من مفتاح API: {error}",
   },
+  compat: {
+    works: "يعمل",
+    mayNotWork: "قد لا يعمل",
+    needsBypass: "يحتاج تجاوز",
+    drmDetected: "تم اكتشاف DRM",
+    accountRequired: "يتطلب حساب طرف ثالث",
+    onlineOnly: "أونلاين فقط",
+    hasOnline: "يحتوي ميزات أونلاين",
+  },
 };
 
 export default ar;

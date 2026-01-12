@@ -115,6 +115,15 @@ const zhTW = {
     validationRequestFailed: "驗證請求失敗，HTTP {status}。",
     validationException: "API 金鑰驗證失敗：{error}",
   },
+  compat: {
+    works: "可運行",
+    mayNotWork: "可能無法運行",
+    needsBypass: "需要繞過",
+    drmDetected: "檢測到DRM (Denuvo等)",
+    accountRequired: "需要第三方帳戶",
+    onlineOnly: "僅限線上",
+    hasOnline: "包含線上功能",
+  },
 };
 
 export default zhTW;

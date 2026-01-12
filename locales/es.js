@@ -116,6 +116,15 @@ const es = {
     validationRequestFailed: "La solicitud de validación falló con HTTP {status}.",
     validationException: "La validación de la clave API falló: {error}",
   },
+  compat: {
+    works: "Funciona",
+    mayNotWork: "Puede no funcionar",
+    needsBypass: "Necesita bypass",
+    drmDetected: "DRM detectado (Denuvo, etc.)",
+    accountRequired: "Requiere cuenta de terceros",
+    onlineOnly: "Solo en línea",
+    hasOnline: "Tiene funciones en línea",
+  },
 };
 
 export default es;

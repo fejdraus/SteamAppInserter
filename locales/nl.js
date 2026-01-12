@@ -115,6 +115,15 @@ const nl = {
     validationRequestFailed: "Validatieverzoek mislukt met HTTP {status}.",
     validationException: "Validatie van API-sleutel mislukt: {error}",
   },
+  compat: {
+    works: "Werkt",
+    mayNotWork: "Werkt mogelijk niet",
+    needsBypass: "Bypass nodig",
+    drmDetected: "DRM gedetecteerd (Denuvo, enz.)",
+    accountRequired: "Account van derden vereist",
+    onlineOnly: "Alleen online",
+    hasOnline: "Heeft online functies",
+  },
 };
 
 export default nl;

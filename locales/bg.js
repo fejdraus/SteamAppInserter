@@ -115,6 +115,15 @@ const bg = {
     validationRequestFailed: "Заявката за валидация се провали с HTTP {status}.",
     validationException: "Провали се валидацията на API ключа: {error}",
   },
+  compat: {
+    works: "Works",
+    mayNotWork: "May not work",
+    needsBypass: "Needs bypass",
+    drmDetected: "DRM detected (Denuvo, etc.)",
+    accountRequired: "Requires third-party account",
+    onlineOnly: "Online only",
+    hasOnline: "Has online features",
+  },
 };
 
 export default bg;

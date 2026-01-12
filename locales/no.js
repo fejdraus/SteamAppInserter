@@ -115,6 +115,15 @@ const no = {
     validationRequestFailed: "Valideringsforespørsel feilet med HTTP {status}.",
     validationException: "Validering av API-nøkkel feilet: {error}",
   },
+  compat: {
+    works: "Fungerer",
+    mayNotWork: "Fungerer kanskje ikke",
+    needsBypass: "Bypass nødvendig",
+    drmDetected: "DRM oppdaget (Denuvo, osv.)",
+    accountRequired: "Tredjepartskonto påkrevd",
+    onlineOnly: "Kun online",
+    hasOnline: "Har onlinefunksjoner",
+  },
 };
 
 export default no;

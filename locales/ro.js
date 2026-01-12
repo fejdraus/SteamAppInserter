@@ -115,6 +115,15 @@ const ro = {
     validationRequestFailed: "Cererea de validare a eșuat cu HTTP {status}.",
     validationException: "Validarea cheii API a eșuat: {error}",
   },
+  compat: {
+    works: "Funcționează",
+    mayNotWork: "S-ar putea să nu funcționeze",
+    needsBypass: "Necesită bypass",
+    drmDetected: "DRM detectat (Denuvo, etc.)",
+    accountRequired: "Necesită cont terț",
+    onlineOnly: "Doar online",
+    hasOnline: "Are funcții online",
+  },
 };
 
 export default ro;

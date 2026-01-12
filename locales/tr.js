@@ -115,6 +115,15 @@ const tr = {
     validationRequestFailed: "Doğrulama isteği HTTP {status} ile başarısız oldu.",
     validationException: "API anahtarı doğrulama başarısız: {error}",
   },
+  compat: {
+    works: "Çalışıyor",
+    mayNotWork: "Çalışmayabilir",
+    needsBypass: "Bypass gerekli",
+    drmDetected: "DRM tespit edildi (Denuvo, vb.)",
+    accountRequired: "Üçüncü taraf hesabı gerekli",
+    onlineOnly: "Sadece çevrimiçi",
+    hasOnline: "Çevrimiçi özellikleri var",
+  },
 };
 
 export default tr;

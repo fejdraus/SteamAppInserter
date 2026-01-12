@@ -119,6 +119,15 @@ const en = {
     manifestNotFoundRyuu: "Manifest for {name} ({appid}) not found on the Ryuu mirror.",
     manifestNotFoundRyuuNoName: "Manifest for {appid} not found on the Ryuu mirror.",
   },
+  compat: {
+    works: "Works",
+    mayNotWork: "May not work",
+    needsBypass: "Needs bypass",
+    drmDetected: "DRM detected (Denuvo, etc.)",
+    accountRequired: "Requires third-party account",
+    onlineOnly: "Online only",
+    hasOnline: "Has online features",
+  },
 };
 
 export default en;

@@ -115,6 +115,15 @@ const zhCN = {
     validationRequestFailed: "验证请求失败，HTTP {status}。",
     validationException: "API 密钥验证失败：{error}",
   },
+  compat: {
+    works: "可运行",
+    mayNotWork: "可能无法运行",
+    needsBypass: "需要绕过",
+    drmDetected: "检测到DRM (Denuvo等)",
+    accountRequired: "需要第三方账户",
+    onlineOnly: "仅限在线",
+    hasOnline: "包含在线功能",
+  },
 };
 
 export default zhCN;

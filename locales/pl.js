@@ -115,6 +115,15 @@ const pl = {
     validationRequestFailed: "Żądanie walidacji nie powiodło się z HTTP {status}.",
     validationException: "Walidacja klucza API nie powiodła się: {error}",
   },
+  compat: {
+    works: "Działa",
+    mayNotWork: "Może nie działać",
+    needsBypass: "Wymaga obejścia",
+    drmDetected: "Wykryto DRM (Denuvo, itp.)",
+    accountRequired: "Wymagane konto zewnętrzne",
+    onlineOnly: "Tylko online",
+    hasOnline: "Ma funkcje online",
+  },
 };
 
 export default pl;

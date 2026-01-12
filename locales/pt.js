@@ -115,6 +115,15 @@ const pt = {
     validationRequestFailed: "Solicitação de validação falhou com HTTP {status}.",
     validationException: "Validação da chave API falhou: {error}",
   },
+  compat: {
+    works: "Funciona",
+    mayNotWork: "Pode não funcionar",
+    needsBypass: "Precisa de bypass",
+    drmDetected: "DRM detectado (Denuvo, etc.)",
+    accountRequired: "Requer conta de terceiros",
+    onlineOnly: "Apenas online",
+    hasOnline: "Tem recursos online",
+  },
 };
 
 export default pt;

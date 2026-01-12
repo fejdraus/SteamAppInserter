@@ -116,6 +116,15 @@ const de = {
     validationRequestFailed: "Validierungsanfrage fehlgeschlagen mit HTTP {status}.",
     validationException: "API-Schlüssel-Validierung fehlgeschlagen: {error}",
   },
+  compat: {
+    works: "Funktioniert",
+    mayNotWork: "Funktioniert evtl. nicht",
+    needsBypass: "Bypass erforderlich",
+    drmDetected: "DRM erkannt (Denuvo, etc.)",
+    accountRequired: "Drittanbieter-Konto erforderlich",
+    onlineOnly: "Nur online",
+    hasOnline: "Hat Online-Funktionen",
+  },
 };
 
 export default de;

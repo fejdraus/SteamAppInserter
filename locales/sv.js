@@ -115,6 +115,15 @@ const sv = {
     validationRequestFailed: "Valideringsbegäran misslyckades med HTTP {status}.",
     validationException: "Validering av API-nyckel misslyckades: {error}",
   },
+  compat: {
+    works: "Fungerar",
+    mayNotWork: "Kanske inte fungerar",
+    needsBypass: "Bypass krävs",
+    drmDetected: "DRM upptäckt (Denuvo, etc.)",
+    accountRequired: "Tredjepartskonto krävs",
+    onlineOnly: "Endast online",
+    hasOnline: "Har onlinefunktioner",
+  },
 };
 
 export default sv;

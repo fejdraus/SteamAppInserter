@@ -47,6 +47,258 @@ const apiState: ApiStatus = {
     maskedKey: '',
     checked: false,
 };
+type CompatLevel = 'ok' | 'warn' | 'bad';
+
+type CompatInfo = {
+    level: CompatLevel;
+    label: string;
+    color: string;
+    reasons: string[];
+};
+
+const COMPAT_BADGE_ID = 'steam-app-inserter-compat-badge';
+
+const ONLINE_TERMS = [
+    'online pvp', 'online co-op', 'co-op online', 'multiplayer online',
+    'massively multiplayer', 'mmo', 'mmorpg', 'cross-platform multiplayer',
+    'crossplay', 'cross-play', 'pvp', 'requires internet connection',
+    'always online', 'live service', 'games as a service'
+];
+
+const SINGLE_PLAYER_TERMS = ['single-player', 'single player', 'singleplayer'];
+
+const DRM_TERMS = [
+    'denuvo', 'securom', 'secucrom', 'arxan', 'vmprotect',
+    'requires 3rd-party drm', 'third-party drm'
+];
+
+const ACCOUNT_TERMS = [
+    'requires 3rd-party account', '3rd-party account', 'ea account', 'ea app',
+    'ea play', 'ubisoft connect', 'uplay', 'rockstar social club', 'rockstar games launcher',
+    'battle.net', 'bethesda.net', '2k account', 'epic account', 'riot account'
+];
+
+const ensureCompatStyles = (): void => {
+    if (document.getElementById('steam-app-inserter-compat-css')) return;
+    const style = document.createElement('style');
+    style.id = 'steam-app-inserter-compat-css';
+    style.textContent = `
+        .sai-compat-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            line-height: 16px;
+            padding: 4px 12px;
+            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            user-select: none;
+            cursor: help;
+            margin-right: 6px;
+            font-family: "Motiva Sans", Arial, sans-serif;
+            position: relative;
+        }
+        .sai-compat-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .sai-compat-text {
+            color: #c6d4df;
+        }
+        .sai-compat-tooltip {
+            position: absolute !important;
+            top: calc(100% + 8px) !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            background: #171a21 !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 4px !important;
+            padding: 10px 14px !important;
+            min-width: 200px !important;
+            max-width: 320px !important;
+            width: max-content !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            z-index: 10000 !important;
+            pointer-events: none;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            text-align: left !important;
+            display: block !important;
+        }
+        .sai-compat-badge:hover .sai-compat-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        .sai-compat-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-bottom-color: #171a21;
+        }
+        .sai-compat-tooltip-title {
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            color: #ffffff !important;
+            display: block !important;
+            white-space: normal !important;
+        }
+        .sai-compat-tooltip-title.has-items {
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .sai-compat-tooltip-item {
+            font-size: 12px !important;
+            color: #acb2b8 !important;
+            line-height: 1.5 !important;
+            padding: 3px 0 !important;
+            display: flex !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+            white-space: normal !important;
+            overflow: visible !important;
+            height: auto !important;
+        }
+        .sai-compat-tooltip-item::before {
+            content: '•';
+            color: #67707b;
+            flex-shrink: 0;
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+const normalizeText = (s: string): string => {
+    try {
+        return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    } catch {
+        return s.toLowerCase().trim();
+    }
+};
+
+const collectPageData = (): { tags: string[]; specs: string[]; notices: string } => {
+    const tagNodes = document.querySelectorAll('.glance_tags .app_tag, .popular_tags .app_tag');
+    const specNodes = document.querySelectorAll('.game_area_details_specs a.name, .game_area_details_specs li');
+    const noticeNodes = document.querySelectorAll('.DRM_notice, .game_area_sys_req, .game_area_description');
+
+    const tags = Array.from(tagNodes).map(n => normalizeText(n.textContent || ''));
+    const specs = Array.from(specNodes).map(n => normalizeText(n.textContent || ''));
+    const notices = normalizeText(Array.from(noticeNodes).map(n => n.textContent || '').join(' '));
+
+    return { tags, specs, notices };
+};
+
+const analyzeCompatibility = (): CompatInfo => {
+    const { tags, specs, notices } = collectPageData();
+    const allText = [...tags, ...specs].join(' ') + ' ' + notices;
+
+    const hasMatch = (terms: string[]): boolean =>
+        terms.some(term => allText.includes(term));
+
+    const hasOnline = hasMatch(ONLINE_TERMS);
+    const hasSingle = hasMatch(SINGLE_PLAYER_TERMS);
+    const hasDrm = hasMatch(DRM_TERMS);
+    const hasAccount = hasMatch(ACCOUNT_TERMS);
+
+    let level: CompatLevel = 'ok';
+    const reasons: string[] = [];
+
+    if (hasDrm) {
+        level = 'bad';
+        reasons.push(t('compat.drmDetected'));
+    }
+
+    if (hasAccount) {
+        if (level !== 'bad') level = 'warn';
+        reasons.push(t('compat.accountRequired'));
+    }
+
+    if (hasOnline && !hasSingle) {
+        if (level !== 'bad') level = 'warn';
+        reasons.push(t('compat.onlineOnly'));
+    } else if (hasOnline && hasSingle) {
+        if (level === 'ok') level = 'warn';
+        reasons.push(t('compat.hasOnline'));
+    }
+
+    const labels: Record<CompatLevel, string> = {
+        ok: t('compat.works'),
+        warn: t('compat.mayNotWork'),
+        bad: t('compat.needsBypass')
+    };
+
+    const colors: Record<CompatLevel, string> = {
+        ok: '#5c7e10',
+        warn: '#a0790b',
+        bad: '#a0352c'
+    };
+
+    return {
+        level,
+        label: labels[level],
+        color: colors[level],
+        reasons
+    };
+};
+
+const renderCompatBadge = (container: HTMLElement): void => {
+    document.getElementById(COMPAT_BADGE_ID)?.remove();
+    ensureCompatStyles();
+
+    const info = analyzeCompatibility();
+
+    const badge = document.createElement('div');
+    badge.id = COMPAT_BADGE_ID;
+    badge.className = 'sai-compat-badge';
+
+    const dot = document.createElement('span');
+    dot.className = 'sai-compat-dot';
+    dot.style.background = info.color;
+
+    const text = document.createElement('span');
+    text.className = 'sai-compat-text';
+    text.textContent = info.label;
+
+    // Custom tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'sai-compat-tooltip';
+
+    const tooltipTitle = document.createElement('div');
+    tooltipTitle.className = 'sai-compat-tooltip-title' + (info.reasons.length > 0 ? ' has-items' : '');
+    tooltipTitle.textContent = info.label;
+    tooltip.appendChild(tooltipTitle);
+
+    if (info.reasons.length > 0) {
+        info.reasons.forEach(reason => {
+            const item = document.createElement('div');
+            item.className = 'sai-compat-tooltip-item';
+            item.textContent = reason;
+            tooltip.appendChild(item);
+        });
+    }
+
+    badge.appendChild(dot);
+    badge.appendChild(text);
+    badge.appendChild(tooltip);
+
+    // Insert at the beginning of container
+    container.insertBefore(badge, container.firstChild);
+};
+
+
+
 
 const createDialogButton = (label: string, variant: 'primary' | 'secondary' = 'primary'): HTMLButtonElement => {
     const button = document.createElement('button');
@@ -376,7 +628,7 @@ const showProgressDialog = (initial: ProgressStatusKey = 'preparing'): ProgressD
     return { setStatus, close };
 };
 
-type MirrorId = 'default' | 'manilua' | 'ryuu';
+type MirrorId = 'default' | 'manilua' | 'kernelos';
 
 type MirrorOption = {
     id: MirrorId;
@@ -386,7 +638,7 @@ type MirrorOption = {
 
 const MIRROR_OPTIONS: readonly MirrorOption[] = [
     { id: 'default', labelKey: 'mirrors.default', requiresApiKey: false },
-    { id: 'ryuu', labelKey: 'mirrors.ryuu', requiresApiKey: false },
+    { id: 'kernelos', labelKey: 'mirrors.kernelos', requiresApiKey: false },
     // { id: 'manilua', labelKey: 'mirrors.maniluaUnderConstruction', requiresApiKey: true },
 ] as const;
 
@@ -654,6 +906,9 @@ const showApiKeyPrompt = async (): Promise<boolean> => {
     });
 };
 
+
+
+
 const ensureManiluaApiKey = async (): Promise<boolean> => {
     let status = await getApiStatus();
     if (status.hasKey && status.isValid !== false) {
@@ -764,8 +1019,10 @@ const showMirrorSelectionModal = async (initial: MirrorId = (currentMirror ?? 'd
                 return;
             }
             if (picked.requiresApiKey) {
-                const ok = await ensureManiluaApiKey();
-                if (!ok) return;
+                if (picked.id === 'manilua') {
+                    const ok = await ensureManiluaApiKey();
+                    if (!ok) return;
+                }
             }
             currentMirror = selected; // запоминаем только для предвыбора
             finish(selected);
@@ -1232,6 +1489,7 @@ export default async function WebkitMain() {
     const insertButtons = async () => {
         try {
             const container = await waitForEl(CONTAINER_SELECTOR) as HTMLElement;
+            renderCompatBadge(container);
             const appId = getAppId();
             if (!appId) return;
 

@@ -115,6 +115,15 @@ const it = {
     validationRequestFailed: "Richiesta di convalida fallita con HTTP {status}.",
     validationException: "Convalida della chiave API fallita: {error}",
   },
+  compat: {
+    works: "Funziona",
+    mayNotWork: "Potrebbe non funzionare",
+    needsBypass: "Richiede bypass",
+    drmDetected: "DRM rilevato (Denuvo, ecc.)",
+    accountRequired: "Richiede account di terze parti",
+    onlineOnly: "Solo online",
+    hasOnline: "Ha funzionalità online",
+  },
 };
 
 export default it;

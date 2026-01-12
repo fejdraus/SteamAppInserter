@@ -115,6 +115,15 @@ const el = {
     validationRequestFailed: "Το αίτημα επικύρωσης απέτυχε με HTTP {status}.",
     validationException: "Η επικύρωση κλειδιού API απέτυχε: {error}",
   },
+  compat: {
+    works: "Works",
+    mayNotWork: "May not work",
+    needsBypass: "Needs bypass",
+    drmDetected: "DRM detected (Denuvo, etc.)",
+    accountRequired: "Requires third-party account",
+    onlineOnly: "Online only",
+    hasOnline: "Has online features",
+  },
 };
 
 export default el;

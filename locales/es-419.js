@@ -115,6 +115,15 @@ const es419 = {
     validationRequestFailed: "Solicitud de validación falló con HTTP {status}.",
     validationException: "Validación de clave API falló: {error}",
   },
+  compat: {
+    works: "Funciona",
+    mayNotWork: "Puede no funcionar",
+    needsBypass: "Necesita bypass",
+    drmDetected: "DRM detectado (Denuvo, etc.)",
+    accountRequired: "Requiere cuenta de terceros",
+    onlineOnly: "Solo en línea",
+    hasOnline: "Tiene funciones en línea",
+  },
 };
 
 export default es419;

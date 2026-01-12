@@ -115,6 +115,15 @@ const hu = {
     validationRequestFailed: "Érvényesítési kérés sikertelen, HTTP {status}.",
     validationException: "API kulcs érvényesítése sikertelen: {error}",
   },
+  compat: {
+    works: "Működik",
+    mayNotWork: "Esetleg nem működik",
+    needsBypass: "Bypass szükséges",
+    drmDetected: "DRM észlelve (Denuvo stb.)",
+    accountRequired: "Harmadik fél fiókja szükséges",
+    onlineOnly: "Csak online",
+    hasOnline: "Online funkciókkal rendelkezik",
+  },
 };
 
 export default hu;

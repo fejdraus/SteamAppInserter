@@ -115,6 +115,15 @@ const th = {
     validationRequestFailed: "คำขอตรวจสอบล้มเหลวด้วย HTTP {status}",
     validationException: "การตรวจสอบความถูกต้องของคีย์ API ล้มเหลว: {error}",
   },
+  compat: {
+    works: "ใช้งานได้",
+    mayNotWork: "อาจไม่ทำงาน",
+    needsBypass: "ต้องการ bypass",
+    drmDetected: "ตรวจพบ DRM (Denuvo ฯลฯ)",
+    accountRequired: "ต้องใช้บัญชีบุคคลที่สาม",
+    onlineOnly: "ออนไลน์เท่านั้น",
+    hasOnline: "มีฟีเจอร์ออนไลน์",
+  },
 };
 
 export default th;
