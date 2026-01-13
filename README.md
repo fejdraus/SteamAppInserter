@@ -52,6 +52,12 @@ This plugin is part of a three-component system:
 - **Automatic Processing** - Processes manifests with SteamTools-compatible logic
 - **One-Click Restart** - Optional Steam restart prompt after adding games
 
+### 🛡️ Security
+
+- **VirusTotal Integration** - Optional malware scanning for downloaded manifests before installation
+- **API Key Support** - Configure your free [VirusTotal API key](https://docs.virustotal.com/docs/please-give-me-an-api-key) in settings
+- **Safety First** - Get warned about potentially dangerous files before they're installed
+
 ### 🎯 Compatibility Badge
 
 - **Visual Indicator** - Shows game compatibility status directly on store pages
@@ -149,18 +155,20 @@ This plugin is part of a three-component system:
 │     ↓                                                       │
 │  4. Plugin downloads .lua manifest from public mirrors      │
 │     ↓                                                       │
-│  5. Plugin processes manifest (removes setManifestid,       │
+│  5. (Optional) VirusTotal scans the file for malware        │
+│     ↓                                                       │
+│  6. Plugin processes manifest (removes setManifestid,       │
 │     adds decryption keys)                                   │
 │     ↓                                                       │
-│  6. Plugin saves to Steam/config/stplug-in/{appid}.lua      │
+│  7. Plugin saves to Steam/config/stplug-in/{appid}.lua      │
 │     ↓                                                       │
-│  7. You restart Steam                                       │
+│  8. You restart Steam                                       │
 │     ↓                                                       │
-│  8. SteamTools reads the .lua file                          │
+│  9. SteamTools reads the .lua file                          │
 │     ↓                                                       │
-│  9. SteamTools unlocks the game in Steam                    │
+│ 10. SteamTools unlocks the game in Steam                    │
 │     ↓                                                       │
-│ 10. Game appears in your library!                           │
+│ 11. Game appears in your library!                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -237,6 +245,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **[SteamTools](https://www.steamtools.net/)** - Game unlocking engine
 - **[ManifestHub](https://github.com/SteamAutoCracks/ManifestHub)** - Public manifest repository
 - **[KernelOS](https://kernelos.org/)** - Alternative manifest repository
+- **[VirusTotal](https://www.virustotal.com/)** - Malware scanning API
 
 ---
 
