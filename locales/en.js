@@ -2,6 +2,8 @@ const en = {
   common: {
     ok: "OK",
     cancel: "Cancel",
+    save: "Save",
+    saving: "Saving...",
     removeAllDlc: "Remove all DLC",
     remove: "Remove",
     errorWithMessage: "Error: {message}",
@@ -63,7 +65,7 @@ const en = {
   },
   status: {
     preparing: "Preparing files...",
-    downloading: "Downloading manifests...",
+    downloading: "Downloading and scanning...",
     merging: "Merging DLC selections...",
     removing: "Removing from library...",
     success: "All done!",
@@ -128,6 +130,15 @@ const en = {
     accountRequired: "Requires third-party account",
     onlineOnly: "Online only",
     hasOnline: "Has online features",
+  },
+  settings: {
+    title: "Settings",
+    vtDescription: "Scan downloaded files for malware before installation. Get your free API key at virustotal.com",
+    vtPlaceholder: "Enter VirusTotal API key...",
+    vtEnabled: "Key configured",
+    vtDisabled: "Key invalid",
+    vtNotConfigured: "Key not set",
+    vtInvalidKey: "Invalid key format (64 characters required)",
   },
 };
 

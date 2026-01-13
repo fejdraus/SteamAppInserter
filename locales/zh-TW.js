@@ -63,7 +63,7 @@ const zhTW = {
   },
   status: {
     preparing: "準備檔案...",
-    downloading: "下載清單...",
+    downloading: "下載並掃描...",
     merging: "合併 DLC 選取...",
     removing: "從收藏庫移除...",
     success: "全部完成！",
@@ -124,6 +124,16 @@ const zhTW = {
     accountRequired: "需要第三方帳戶",
     onlineOnly: "僅限線上",
     hasOnline: "包含線上功能",
+  },
+
+  settings: {
+    title: "設定",
+    vtDescription: "安裝前掃描下載的檔案以檢測惡意軟體。在 virustotal.com 取得免費 API 金鑰",
+    vtPlaceholder: "輸入 VirusTotal API 金鑰...",
+    vtEnabled: "金鑰已輸入",
+    vtDisabled: "金鑰錯誤",
+    vtNotConfigured: "金鑰未輸入",
+    vtInvalidKey: "金鑰格式無效（需要 64 個字元）",
   },
 };
 

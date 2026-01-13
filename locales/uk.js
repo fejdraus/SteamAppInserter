@@ -2,6 +2,8 @@ const uk = {
   common: {
     ok: "OK",
     cancel: "Скасувати",
+    save: "Зберегти",
+    saving: "Збереження...",
     removeAllDlc: "Видалити всі DLC",
     remove: "Видалити",
     errorWithMessage: "Помилка: {message}",
@@ -65,7 +67,7 @@ const uk = {
   },
   status: {
     preparing: "Підготовка файлів...",
-    downloading: "Завантаження маніфестів...",
+    downloading: "Завантаження та перевірка...",
     merging: "Застосування обраних DLC...",
     removing: "Видалення з бібліотеки...",
     success: "Готово!",
@@ -131,6 +133,15 @@ const uk = {
     accountRequired: "Потрібен сторонній акаунт",
     onlineOnly: "Тільки онлайн",
     hasOnline: "Є онлайн-функції",
+  },
+  settings: {
+    title: "Налаштування",
+    vtDescription: "Перевіряти завантажені файли на віруси перед встановленням. Отримайте безкоштовний API-ключ на virustotal.com",
+    vtPlaceholder: "Введіть API-ключ VirusTotal...",
+    vtEnabled: "Ключ введено",
+    vtDisabled: "Ключ невірний",
+    vtNotConfigured: "Ключ не введено",
+    vtInvalidKey: "Невірний формат ключа (потрібно 64 символи)",
   },
 };
 

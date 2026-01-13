@@ -63,7 +63,7 @@ const th = {
   },
   status: {
     preparing: "กำลังเตรียมไฟล์...",
-    downloading: "กำลังดาวน์โหลด manifest...",
+    downloading: "กำลังดาวน์โหลดและสแกน...",
     merging: "กำลังรวมการเลือก DLC...",
     removing: "กำลังลบออกจากคลัง...",
     success: "เสร็จสิ้น!",
@@ -124,6 +124,16 @@ const th = {
     accountRequired: "ต้องใช้บัญชีบุคคลที่สาม",
     onlineOnly: "ออนไลน์เท่านั้น",
     hasOnline: "มีฟีเจอร์ออนไลน์",
+  },
+
+  settings: {
+    title: "การตั้งค่า",
+    vtDescription: "สแกนไฟล์ที่ดาวน์โหลดเพื่อหามัลแวร์ก่อนติดตั้ง รับ API key ฟรีที่ virustotal.com",
+    vtPlaceholder: "ใส่ VirusTotal API key...",
+    vtEnabled: "ใส่คีย์แล้ว",
+    vtDisabled: "คีย์ไม่ถูกต้อง",
+    vtNotConfigured: "ยังไม่ได้ใส่คีย์",
+    vtInvalidKey: "รูปแบบคีย์ไม่ถูกต้อง (ต้องการ 64 ตัวอักษร)",
   },
 };
 

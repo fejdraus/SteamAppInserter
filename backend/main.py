@@ -21,6 +21,36 @@ from config import (
     KERNELOS_DOWNLOAD_URL,
 )
 
+# Security utilities
+try:
+    from security import validate_zip_archive
+except ImportError:
+    def validate_zip_archive(archive_bytes, appid="unknown"):
+        return True, None
+
+# VirusTotal integration
+try:
+    from virustotal import scan_archive as vt_scan_archive, scan_text as vt_scan_text
+    VT_AVAILABLE = True
+except ImportError:
+    VT_AVAILABLE = False
+    def vt_scan_archive(archive_bytes, appid, api_key=None):
+        return True, "VirusTotal module not available"
+    def vt_scan_text(text_content, appid, api_key=None):
+        return True, "VirusTotal module not available"
+
+# VirusTotal API key storage
+_vt_api_key: Optional[str] = None
+
+def set_vt_api_key(key: Optional[str]) -> None:
+    """Set VirusTotal API key."""
+    global _vt_api_key
+    _vt_api_key = key
+
+def get_vt_api_key() -> Optional[str]:
+    """Get VirusTotal API key."""
+    return _vt_api_key
+
 try:
     import Millennium
     import PluginUtils
@@ -62,8 +92,10 @@ class Plugin:
     def __init__(self):
         self.plugin_dir = GetPluginDir()
         self.backend_path = os.path.join(self.plugin_dir, 'backend', 'api_key.txt')
+        self.vt_key_path = os.path.join(self.plugin_dir, 'backend', 'vt_api_key.txt')
         self._api_key: Optional[str] = None
         self._load_api_key()
+        self._load_vt_api_key()
 
     def _load_api_key(self):
         try:
@@ -108,6 +140,45 @@ class Plugin:
 
     def set_api_key(self, api_key: Optional[str]):
         self._save_api_key(api_key)
+
+    def _load_vt_api_key(self):
+        """Load VirusTotal API key from disk."""
+        try:
+            if os.path.isfile(self.vt_key_path):
+                with open(self.vt_key_path, "r", encoding="utf-8") as f:
+                    candidate = f.read().strip()
+                    if candidate:
+                        set_vt_api_key(candidate)
+                        logger.log("Loaded VirusTotal API key from backend")
+                    else:
+                        set_vt_api_key(None)
+            else:
+                set_vt_api_key(None)
+        except Exception as exc:
+            logger.log(f"Failed to load VirusTotal API key: {exc}")
+            set_vt_api_key(None)
+
+    def _save_vt_api_key(self, api_key: Optional[str]):
+        """Save VirusTotal API key to disk."""
+        try:
+            _ensure_directory(os.path.dirname(self.vt_key_path))
+            if api_key:
+                with open(self.vt_key_path, "w", encoding="utf-8") as f:
+                    f.write(api_key.strip())
+                set_vt_api_key(api_key.strip())
+            else:
+                if os.path.isfile(self.vt_key_path):
+                    os.remove(self.vt_key_path)
+                set_vt_api_key(None)
+        except Exception as exc:
+            logger.error(f"Failed to save VirusTotal API key: {exc}")
+            raise
+
+    def get_vt_api_key(self) -> Optional[str]:
+        return get_vt_api_key()
+
+    def set_vt_api_key(self, api_key: Optional[str]):
+        self._save_vt_api_key(api_key)
 
     def _front_end_loaded(self):
         logger.log('Frontend loaded!')
@@ -225,6 +296,22 @@ def _extract_manilua_archive(appid: str, archive_bytes: bytes) -> dict[str, Any]
         'error': None
     }
 
+    # Security: Validate ZIP structure
+    is_valid, error_msg = validate_zip_archive(archive_bytes, appid)
+    if not is_valid:
+        result['error'] = f"Security validation failed: {error_msg}"
+        logger.error(f"Manilua archive for {appid} failed security check: {error_msg}")
+        return result
+
+    # Security: VirusTotal scan
+    if VT_AVAILABLE:
+        is_safe, vt_message = vt_scan_archive(archive_bytes, appid, get_vt_api_key())
+        logger.log(f"Manilua {appid}: {vt_message}")
+        if not is_safe:
+            result['error'] = vt_message
+            logger.error(f"Manilua archive for {appid} blocked: {vt_message}")
+            return result
+
     try:
         with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
             file_list = archive.namelist()
@@ -337,6 +424,22 @@ def _extract_kernelos_archive(appid: str, archive_bytes: bytes) -> dict[str, Any
         'installed_files': [],
         'error': None
     }
+
+    # Security: Validate ZIP structure
+    is_valid, error_msg = validate_zip_archive(archive_bytes, appid)
+    if not is_valid:
+        result['error'] = f"Security validation failed: {error_msg}"
+        logger.error(f"KernelOS archive for {appid} failed security check: {error_msg}")
+        return result
+
+    # Security: VirusTotal scan
+    if VT_AVAILABLE:
+        is_safe, vt_message = vt_scan_archive(archive_bytes, appid, get_vt_api_key())
+        logger.log(f"KernelOS {appid}: {vt_message}")
+        if not is_safe:
+            result['error'] = vt_message
+            logger.error(f"KernelOS archive for {appid} blocked: {vt_message}")
+            return result
 
     try:
         with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
@@ -455,8 +558,18 @@ def download_lua_manifest_kernelos(appid: str) -> tuple[Optional[str], Optional[
 
         # Handle ZIP files
         if content_type.startswith('application/zip') or raw[:2] == b'PK':
+            # Security: Validate and scan
+            is_valid, error_msg = validate_zip_archive(raw, appid)
+            if not is_valid:
+                logger.error(f"KernelOS inline archive for {appid} failed security check: {error_msg}")
+                return None, None
+            if VT_AVAILABLE:
+                is_safe, vt_message = vt_scan_archive(raw, appid, get_vt_api_key())
+                logger.log(f"KernelOS inline {appid}: {vt_message}")
+                if not is_safe:
+                    logger.error(f"KernelOS inline archive for {appid} blocked: {vt_message}")
+                    return None, None
             try:
-                import zipfile
                 from io import BytesIO
                 with zipfile.ZipFile(BytesIO(raw), 'r') as zf:
                     for name in zf.namelist():
@@ -484,43 +597,6 @@ def download_lua_manifest_kernelos(appid: str) -> tuple[Optional[str], Optional[
         logger.log(f"KernelOS: Error downloading manifest for {appid}: {exc}")
         return None, None
 
-
-
-
-
-
-        content_type = (dl_result.get('content_type') or '').lower()
-
-        # Handle ZIP files
-        if content_type.startswith('application/zip') or raw[:2] == b'PK':
-            try:
-                import zipfile
-                from io import BytesIO
-                with zipfile.ZipFile(BytesIO(raw), 'r') as zf:
-                    for name in zf.namelist():
-                        if name.lower().endswith('.lua'):
-                            lua_bytes = zf.read(name)
-                            return lua_bytes.decode('utf-8', errors='replace'), None
-                logger.log(f"SteamLua: No .lua file found in archive for {appid}")
-                return None, None
-            except zipfile.BadZipFile:
-                pass
-
-        # Handle plain lua content
-        try:
-            text = raw.decode('utf-8')
-        except UnicodeDecodeError:
-            text = raw.decode('utf-8', errors='replace')
-
-        if text.strip():
-            return text, None
-
-        logger.log(f"SteamLua: Empty content for {appid}")
-        return None, None
-
-    except Exception as exc:
-        logger.log(f"SteamLua: Error downloading manifest for {appid}: {exc}")
-        return None, None
 
 def download_lua_manifest_manilua(appid: str, api_key: str) -> tuple[Optional[str], Optional[int]]:
     try:
@@ -648,6 +724,17 @@ def download_lua_manifest_text(appid: str, mirror: str = 'default') -> tuple[Opt
             raw = result['data']
 
             if content_type.startswith("application/zip") or raw[:2] == b"PK":
+                # Security: Validate and scan
+                is_valid, error_msg = validate_zip_archive(raw, appid)
+                if not is_valid:
+                    logger.error(f"Manilua manifest archive for {appid} failed security check: {error_msg}")
+                    return None, None
+                if VT_AVAILABLE:
+                    is_safe, vt_message = vt_scan_archive(raw, appid, get_vt_api_key())
+                    logger.log(f"Manilua manifest {appid}: {vt_message}")
+                    if not is_safe:
+                        logger.error(f"Manilua manifest archive for {appid} blocked: {vt_message}")
+                        return None, None
                 with zipfile.ZipFile(io.BytesIO(raw)) as archive:
                     for file_name in archive.namelist():
                         if file_name.endswith('.lua'):
@@ -683,6 +770,13 @@ def download_lua_manifest(appid: str, mirror: str = 'default') -> Optional[str]:
         result, _ = download_lua_manifest_kernelos(appid)
     else:
         result = _download_text(_build_manifest_urls(appid, '.lua'))
+        # Security: VirusTotal scan for ManifestHub text files
+        if result and VT_AVAILABLE:
+            is_safe, vt_message = vt_scan_text(result, appid, get_vt_api_key())
+            logger.log(f"ManifestHub {appid}: {vt_message}")
+            if not is_safe:
+                logger.error(f"ManifestHub lua for {appid} blocked: {vt_message}")
+                return None
 
     if result is not None:
         _set_to_cache(cache_key, result)
@@ -1644,6 +1738,55 @@ class Backend:
         except Exception as exc:
             logger.log(f"Failed to save Manilua API key: {exc}")
             return {'success': False, 'error': str(exc)}
+
+    @staticmethod
+    def get_vt_api_status(payload: Any = None, **kwargs) -> dict[str, Any]:
+        """Get VirusTotal API key status."""
+        try:
+            api_key = get_vt_api_key()
+            has_key = bool(api_key)
+            result = {
+                'success': True,
+                'hasKey': has_key,
+                'apiKey': api_key or '',
+                'isEnabled': VT_AVAILABLE and has_key
+            }
+            logger.log(f"get_vt_api_status: hasKey={has_key}, isEnabled={VT_AVAILABLE and has_key}")
+            return result
+        except Exception as exc:
+            logger.error(f"Failed to get VT API status: {exc}")
+            return {'success': False, 'hasKey': False, 'apiKey': '', 'isEnabled': False}
+
+    @staticmethod
+    def set_vt_api_key(payload: Any = None, **kwargs) -> dict[str, Any]:
+        """Set VirusTotal API key."""
+        try:
+            data: dict[str, Any] = {}
+            if isinstance(payload, dict):
+                data.update(payload)
+            if kwargs:
+                data.update(kwargs)
+            api_key = data.get('api_key')
+            
+            # Allow clearing the key
+            if api_key is None or api_key == '':
+                get_plugin().set_vt_api_key(None)
+                logger.log('VirusTotal API key cleared.')
+                return {'success': True, 'message': 'VirusTotal API key cleared.'}
+            
+            if not isinstance(api_key, str):
+                return {'success': False, 'message': 'API key must be a string.'}
+            
+            candidate = api_key.strip()
+            if len(candidate) != 64:
+                return {'success': False, 'message': 'Invalid API key format. VirusTotal keys are 64 characters.'}
+            
+            get_plugin().set_vt_api_key(candidate)
+            logger.log('VirusTotal API key stored.')
+            return {'success': True, 'message': 'VirusTotal API key saved successfully.'}
+        except Exception as exc:
+            logger.error(f"Failed to save VT API key: {exc}")
+            return {'success': False, 'message': str(exc)}
 
     @staticmethod
     def get_dlc_list(payload: Any = None, **kwargs) -> dict[str, Any]:

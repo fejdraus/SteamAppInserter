@@ -63,7 +63,7 @@ const it = {
   },
   status: {
     preparing: "Preparazione dei file...",
-    downloading: "Download dei manifest...",
+    downloading: "Download e scansione...",
     merging: "Unione delle selezioni DLC...",
     removing: "Rimozione dalla libreria...",
     success: "Tutto fatto!",
@@ -124,6 +124,16 @@ const it = {
     accountRequired: "Richiede account di terze parti",
     onlineOnly: "Solo online",
     hasOnline: "Ha funzionalità online",
+  },
+
+  settings: {
+    title: "Impostazioni",
+    vtDescription: "Scansiona i file scaricati per malware prima dellinstallazione. Ottieni la tua chiave API gratuita su virustotal.com",
+    vtPlaceholder: "Inserisci la chiave API VirusTotal...",
+    vtEnabled: "Chiave inserita",
+    vtDisabled: "Chiave errata",
+    vtNotConfigured: "Chiave non inserita",
+    vtInvalidKey: "Formato chiave non valido (richiesti 64 caratteri)",
   },
 };
 

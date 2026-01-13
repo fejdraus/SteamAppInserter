@@ -63,7 +63,7 @@ const vi = {
   },
   status: {
     preparing: "Đang chuẩn bị tệp...",
-    downloading: "Đang tải xuống manifest...",
+    downloading: "Đang tải và quét...",
     merging: "Đang gộp lựa chọn DLC...",
     removing: "Đang xóa khỏi thư viện...",
     success: "Tất cả hoàn thành!",
@@ -124,6 +124,16 @@ const vi = {
     accountRequired: "Cần tài khoản bên thứ ba",
     onlineOnly: "Chỉ trực tuyến",
     hasOnline: "Có tính năng trực tuyến",
+  },
+
+  settings: {
+    title: "Cài đặt",
+    vtDescription: "Quét các tệp đã tải xuống để tìm phần mềm độc hại trước khi cài đặt. Nhận khóa API miễn phí tại virustotal.com",
+    vtPlaceholder: "Nhập khóa API VirusTotal...",
+    vtEnabled: "Đã nhập khóa",
+    vtDisabled: "Khóa không đúng",
+    vtNotConfigured: "Chưa nhập khóa",
+    vtInvalidKey: "Định dạng khóa không hợp lệ (cần 64 ký tự)",
   },
 };
 

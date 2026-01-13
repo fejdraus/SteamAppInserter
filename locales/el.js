@@ -63,7 +63,7 @@ const el = {
   },
   status: {
     preparing: "Προετοιμασία αρχείων...",
-    downloading: "Λήψη manifests...",
+    downloading: "Λήψη και σάρωση...",
     merging: "Συγχώνευση επιλογών DLC...",
     removing: "Αφαίρεση από τη βιβλιοθήκη...",
     success: "Όλα έτοιμα!",
@@ -124,6 +124,16 @@ const el = {
     accountRequired: "Requires third-party account",
     onlineOnly: "Online only",
     hasOnline: "Has online features",
+  },
+
+  settings: {
+    title: "Ρυθμίσεις",
+    vtDescription: "Σάρωση ληφθέντων αρχείων για κακόβουλο λογισμικό πριν την εγκατάσταση. Αποκτήστε το δωρεάν κλειδί API στο virustotal.com",
+    vtPlaceholder: "Εισάγετε κλειδί API VirusTotal...",
+    vtEnabled: "Κλειδί εισήχθη",
+    vtDisabled: "Κλειδί λανθασμένο",
+    vtNotConfigured: "Κλειδί δεν έχει εισαχθεί",
+    vtInvalidKey: "Μη έγκυρη μορφή κλειδιού (απαιτούνται 64 χαρακτήρες)",
   },
 };
 

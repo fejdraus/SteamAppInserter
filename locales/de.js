@@ -63,7 +63,7 @@ const de = {
   },
   status: {
     preparing: "Dateien vorbereiten...",
-    downloading: "Manifeste herunterladen...",
+    downloading: "Herunterladen und Scannen...",
     merging: "DLC-Auswahl zusammenführen...",
     removing: "Aus Bibliothek entfernen...",
     success: "Erledigt!",
@@ -125,6 +125,16 @@ const de = {
     accountRequired: "Drittanbieter-Konto erforderlich",
     onlineOnly: "Nur online",
     hasOnline: "Hat Online-Funktionen",
+  },
+
+  settings: {
+    title: "Einstellungen",
+    vtDescription: "Heruntergeladene Dateien vor der Installation auf Malware scannen. Holen Sie sich Ihren kostenlosen API-Schlüssel auf virustotal.com",
+    vtPlaceholder: "VirusTotal API-Schlüssel eingeben...",
+    vtEnabled: "Schlüssel eingegeben",
+    vtDisabled: "Schlüssel ist falsch",
+    vtNotConfigured: "Schlüssel nicht eingegeben",
+    vtInvalidKey: "Ungültiges Schlüsselformat (64 Zeichen erforderlich)",
   },
 };
 

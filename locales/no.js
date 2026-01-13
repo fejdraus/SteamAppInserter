@@ -63,7 +63,7 @@ const no = {
   },
   status: {
     preparing: "Forbereder filer...",
-    downloading: "Laster ned manifest...",
+    downloading: "Laster ned og skanner...",
     merging: "Fletter DLC-valg...",
     removing: "Fjerner fra bibliotek...",
     success: "Alt klart!",
@@ -124,6 +124,16 @@ const no = {
     accountRequired: "Tredjepartskonto påkrevd",
     onlineOnly: "Kun online",
     hasOnline: "Har onlinefunksjoner",
+  },
+
+  settings: {
+    title: "Innstillinger",
+    vtDescription: "Skann nedlastede filer for skadelig programvare før installasjon. Få din gratis API-nøkkel på virustotal.com",
+    vtPlaceholder: "Skriv inn VirusTotal API-nøkkel...",
+    vtEnabled: "Nøkkel angitt",
+    vtDisabled: "Nøkkel er feil",
+    vtNotConfigured: "Nøkkel ikke angitt",
+    vtInvalidKey: "Ugyldig nøkkelformat (64 tegn kreves)",
   },
 };
 

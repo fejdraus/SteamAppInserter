@@ -63,7 +63,7 @@ const es419 = {
   },
   status: {
     preparing: "Preparando archivos...",
-    downloading: "Descargando manifests...",
+    downloading: "Descargando y escaneando...",
     merging: "Fusionando selecciones de DLC...",
     removing: "Eliminando de la biblioteca...",
     success: "¡Todo listo!",
@@ -124,6 +124,16 @@ const es419 = {
     accountRequired: "Requiere cuenta de terceros",
     onlineOnly: "Solo en línea",
     hasOnline: "Tiene funciones en línea",
+  },
+
+  settings: {
+    title: "Configuración",
+    vtDescription: "Escanear archivos descargados en busca de malware antes de la instalación. Obtén tu clave API gratuita en virustotal.com",
+    vtPlaceholder: "Ingresa la clave API de VirusTotal...",
+    vtEnabled: "Clave ingresada",
+    vtDisabled: "Clave incorrecta",
+    vtNotConfigured: "Clave no ingresada",
+    vtInvalidKey: "Formato de clave inválido (se requieren 64 caracteres)",
   },
 };
 

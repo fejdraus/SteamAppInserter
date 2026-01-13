@@ -63,7 +63,7 @@ const fi = {
   },
   status: {
     preparing: "Valmistellaan tiedostoja...",
-    downloading: "Ladataan manifestejä...",
+    downloading: "Ladataan ja skannataan...",
     merging: "Yhdistetään DLC-valintoja...",
     removing: "Poistetaan kirjastosta...",
     success: "Kaikki valmis!",
@@ -124,6 +124,16 @@ const fi = {
     accountRequired: "Kolmannen osapuolen tili vaaditaan",
     onlineOnly: "Vain verkossa",
     hasOnline: "Sisältää verkko-ominaisuuksia",
+  },
+
+  settings: {
+    title: "Asetukset",
+    vtDescription: "Skannaa ladatut tiedostot haittaohjelmien varalta ennen asennusta. Hanki ilmainen API-avain osoitteesta virustotal.com",
+    vtPlaceholder: "Syötä VirusTotal API-avain...",
+    vtEnabled: "Avain syötetty",
+    vtDisabled: "Avain on virheellinen",
+    vtNotConfigured: "Avainta ei ole syötetty",
+    vtInvalidKey: "Virheellinen avainmuoto (vaaditaan 64 merkkiä)",
   },
 };
 

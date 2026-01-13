@@ -63,7 +63,7 @@ const zhCN = {
   },
   status: {
     preparing: "准备文件...",
-    downloading: "下载清单...",
+    downloading: "下载并扫描...",
     merging: "合并 DLC 选择...",
     removing: "从库中移除...",
     success: "全部完成！",
@@ -124,6 +124,16 @@ const zhCN = {
     accountRequired: "需要第三方账户",
     onlineOnly: "仅限在线",
     hasOnline: "包含在线功能",
+  },
+
+  settings: {
+    title: "设置",
+    vtDescription: "安装前扫描下载的文件以检测恶意软件。在 virustotal.com 获取免费 API 密钥",
+    vtPlaceholder: "输入 VirusTotal API 密钥...",
+    vtEnabled: "密钥已输入",
+    vtDisabled: "密钥错误",
+    vtNotConfigured: "密钥未输入",
+    vtInvalidKey: "密钥格式无效（需要 64 个字符）",
   },
 };
 

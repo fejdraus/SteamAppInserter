@@ -63,7 +63,7 @@ const bg = {
   },
   status: {
     preparing: "Подготовка на файлове...",
-    downloading: "Изтегляне на манифести...",
+    downloading: "Изтегляне и сканиране...",
     merging: "Сливане на DLC селекции...",
     removing: "Премахване от библиотеката...",
     success: "Всичко е готово!",
@@ -124,6 +124,16 @@ const bg = {
     accountRequired: "Requires third-party account",
     onlineOnly: "Online only",
     hasOnline: "Has online features",
+  },
+
+  settings: {
+    title: "Настройки",
+    vtDescription: "Сканиране на изтеглени файлове за злонамерен софтуер преди инсталиране. Вземете безплатен API ключ от virustotal.com",
+    vtPlaceholder: "Въведете API ключ за VirusTotal...",
+    vtEnabled: "Ключът е въведен",
+    vtDisabled: "Ключът е грешен",
+    vtNotConfigured: "Ключът не е въведен",
+    vtInvalidKey: "Невалиден формат на ключа (изисква се 64 символа)",
   },
 };
 

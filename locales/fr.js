@@ -63,7 +63,7 @@ const fr = {
   },
   status: {
     preparing: "Preparation des fichiers...",
-    downloading: "Telechargement des manifestes...",
+    downloading: "Téléchargement et analyse...",
     merging: "Fusion des selections de DLC...",
     removing: "Retrait de la bibliotheque...",
     success: "Termine !",
@@ -125,6 +125,16 @@ const fr = {
     accountRequired: "Compte tiers requis",
     onlineOnly: "En ligne uniquement",
     hasOnline: "Fonctionnalités en ligne",
+  },
+
+  settings: {
+    title: "Paramètres",
+    vtDescription: "Analyser les fichiers téléchargés pour détecter les malwares avant installation. Obtenez votre clé API gratuite sur virustotal.com",
+    vtPlaceholder: "Entrez la clé API VirusTotal...",
+    vtEnabled: "Clé saisie",
+    vtDisabled: "Clé incorrecte",
+    vtNotConfigured: "Clé non saisie",
+    vtInvalidKey: "Format de clé invalide (64 caractères requis)",
   },
 };
 

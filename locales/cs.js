@@ -63,7 +63,7 @@ const cs = {
   },
   status: {
     preparing: "Připravování souborů...",
-    downloading: "Stahování manifestů...",
+    downloading: "Stahování a skenování...",
     merging: "Slučování výběrů DLC...",
     removing: "Odebírání z knihovny...",
     success: "Vše hotovo!",
@@ -124,6 +124,16 @@ const cs = {
     accountRequired: "Vyžaduje účet třetí strany",
     onlineOnly: "Pouze online",
     hasOnline: "Obsahuje online funkce",
+  },
+
+  settings: {
+    title: "Nastavení",
+    vtDescription: "Skenovat stažené soubory na malware před instalací. Získejte bezplatný API klíč na virustotal.com",
+    vtPlaceholder: "Zadejte API klíč VirusTotal...",
+    vtEnabled: "Klíč zadán",
+    vtDisabled: "Klíč je nesprávný",
+    vtNotConfigured: "Klíč není zadán",
+    vtInvalidKey: "Neplatný formát klíče (vyžaduje se 64 znaků)",
   },
 };
 

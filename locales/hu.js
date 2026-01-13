@@ -63,7 +63,7 @@ const hu = {
   },
   status: {
     preparing: "Fájlok előkészítése...",
-    downloading: "Manifestumok letöltése...",
+    downloading: "Letöltés és vizsgálat...",
     merging: "DLC kiválasztások egyesítése...",
     removing: "Eltávolítás a könyvtárból...",
     success: "Minden kész!",
@@ -124,6 +124,16 @@ const hu = {
     accountRequired: "Harmadik fél fiókja szükséges",
     onlineOnly: "Csak online",
     hasOnline: "Online funkciókkal rendelkezik",
+  },
+
+  settings: {
+    title: "Beállítások",
+    vtDescription: "Letöltött fájlok vizsgálata kártevők ellen telepítés előtt. Szerezze be ingyenes API kulcsát a virustotal.com oldalon",
+    vtPlaceholder: "Adja meg a VirusTotal API kulcsot...",
+    vtEnabled: "Kulcs megadva",
+    vtDisabled: "Kulcs helytelen",
+    vtNotConfigured: "Kulcs nincs megadva",
+    vtInvalidKey: "Érvénytelen kulcsformátum (64 karakter szükséges)",
   },
 };
 

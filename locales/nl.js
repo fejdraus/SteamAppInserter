@@ -63,7 +63,7 @@ const nl = {
   },
   status: {
     preparing: "Bestanden voorbereiden...",
-    downloading: "Manifesten downloaden...",
+    downloading: "Downloaden en scannen...",
     merging: "DLC-selecties samenvoegen...",
     removing: "Verwijderen uit bibliotheek...",
     success: "Alles klaar!",
@@ -124,6 +124,16 @@ const nl = {
     accountRequired: "Account van derden vereist",
     onlineOnly: "Alleen online",
     hasOnline: "Heeft online functies",
+  },
+
+  settings: {
+    title: "Instellingen",
+    vtDescription: "Scan gedownloade bestanden op malware voor installatie. Haal je gratis API-sleutel op virustotal.com",
+    vtPlaceholder: "Voer VirusTotal API-sleutel in...",
+    vtEnabled: "Sleutel ingevoerd",
+    vtDisabled: "Sleutel is onjuist",
+    vtNotConfigured: "Sleutel niet ingevoerd",
+    vtInvalidKey: "Ongeldig sleutelformaat (64 tekens vereist)",
   },
 };
 

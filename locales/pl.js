@@ -63,7 +63,7 @@ const pl = {
   },
   status: {
     preparing: "Przygotowywanie plików...",
-    downloading: "Pobieranie manifestów...",
+    downloading: "Pobieranie i skanowanie...",
     merging: "Scalanie wyborów DLC...",
     removing: "Usuwanie z biblioteki...",
     success: "Wszystko gotowe!",
@@ -124,6 +124,16 @@ const pl = {
     accountRequired: "Wymagane konto zewnętrzne",
     onlineOnly: "Tylko online",
     hasOnline: "Ma funkcje online",
+  },
+
+  settings: {
+    title: "Ustawienia",
+    vtDescription: "Skanuj pobrane pliki w poszukiwaniu złośliwego oprogramowania przed instalacją. Pobierz darmowy klucz API na virustotal.com",
+    vtPlaceholder: "Wprowadź klucz API VirusTotal...",
+    vtEnabled: "Klucz wprowadzony",
+    vtDisabled: "Klucz jest nieprawidłowy",
+    vtNotConfigured: "Klucz nie wprowadzony",
+    vtInvalidKey: "Nieprawidłowy format klucza (wymagane 64 znaki)",
   },
 };
 

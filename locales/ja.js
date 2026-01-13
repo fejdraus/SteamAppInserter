@@ -63,7 +63,7 @@ const ja = {
   },
   status: {
     preparing: "ファイルを準備中...",
-    downloading: "マニフェストをダウンロード中...",
+    downloading: "ダウンロードとスキャン中...",
     merging: "DLC の選択をマージ中...",
     removing: "ライブラリから削除中...",
     success: "すべて完了！",
@@ -124,6 +124,16 @@ const ja = {
     accountRequired: "サードパーティアカウントが必要",
     onlineOnly: "オンライン専用",
     hasOnline: "オンライン機能あり",
+  },
+
+  settings: {
+    title: "設定",
+    vtDescription: "インストール前にダウンロードしたファイルをマルウェアスキャン。virustotal.comで無料のAPIキーを取得",
+    vtPlaceholder: "VirusTotal APIキーを入力...",
+    vtEnabled: "キー入力済み",
+    vtDisabled: "キーが間違っています",
+    vtNotConfigured: "キー未入力",
+    vtInvalidKey: "無効なキー形式（64文字必要）",
   },
 };
 

@@ -63,7 +63,7 @@ const ar = {
   },
   status: {
     preparing: "جارٍ تحضير الملفات...",
-    downloading: "جارٍ تحميل البيانات...",
+    downloading: "جارٍ التحميل والفحص...",
     merging: "جارٍ دمج اختيارات DLC...",
     removing: "جارٍ الإزالة من المكتبة...",
     success: "انتهى الكل!",
@@ -124,6 +124,16 @@ const ar = {
     accountRequired: "يتطلب حساب طرف ثالث",
     onlineOnly: "أونلاين فقط",
     hasOnline: "يحتوي ميزات أونلاين",
+  },
+
+  settings: {
+    title: "الإعدادات",
+    vtDescription: "فحص الملفات المحملة بحثًا عن البرامج الضارة قبل التثبيت. احصل على مفتاح API مجاني من virustotal.com",
+    vtPlaceholder: "أدخل مفتاح API لـ VirusTotal...",
+    vtEnabled: "تم إدخال المفتاح",
+    vtDisabled: "المفتاح غير صحيح",
+    vtNotConfigured: "لم يتم إدخال المفتاح",
+    vtInvalidKey: "تنسيق المفتاح غير صالح (مطلوب 64 حرفًا)",
   },
 };
 

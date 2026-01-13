@@ -39,6 +39,8 @@ const checkPirated = callable<[{ id: string }], boolean>('Backend.checkpirated')
 const restartt = callable<[], boolean>('Backend.restart');
 const setManiluaApiKeyRpc = callable<[{ api_key: string }], RawBackendResponse>('Backend.set_manilua_api_key');
 const getManiluaApiStatusRpc = callable<[], RawBackendResponse>('Backend.get_manilua_api_status');
+const setVtApiKeyRpc = callable<[{ api_key: string }], RawBackendResponse>('Backend.set_vt_api_key');
+const getVtApiStatusRpc = callable<[], RawBackendResponse>('Backend.get_vt_api_status');
 
 let isBusy = false;
 const apiState: ApiStatus = {
@@ -1045,6 +1047,158 @@ const ensureManiluaApiKey = async (): Promise<boolean> => {
     return true;
 };
 
+type VtStatus = {
+    hasKey: boolean;
+    apiKey: string;
+    isEnabled: boolean;
+};
+
+const getVtStatus = async (): Promise<VtStatus> => {
+    try {
+        let raw = await getVtApiStatusRpc();
+        
+        // Parse if it's a JSON string
+        if (typeof raw === 'string') {
+            try {
+                raw = JSON.parse(raw);
+            } catch {
+                // Not JSON, keep as is
+            }
+        }
+        
+        if (raw && typeof raw === 'object') {
+            const obj = raw as Record<string, unknown>;
+            return {
+                hasKey: Boolean(obj.hasKey),
+                apiKey: String(obj.apiKey || ''),
+                isEnabled: Boolean(obj.isEnabled),
+            };
+        }
+    } catch (err) {
+        console.error('Failed to get VT status:', err);
+    }
+    return { hasKey: false, apiKey: '', isEnabled: false };
+};
+
+const showSettingsDialog = async (): Promise<void> => {
+    if (!document?.body) return;
+
+    const vtStatus = await getVtStatus();
+
+    return new Promise<void>((resolve) => {
+        const { content, actions, close } = createDialogShell(t('settings.title') || 'Settings');
+
+        // VirusTotal section
+        const vtSection = document.createElement('div');
+        vtSection.style.marginBottom = '16px';
+
+        const vtTitle = document.createElement('div');
+        vtTitle.style.fontWeight = 'bold';
+        vtTitle.style.marginBottom = '8px';
+        vtTitle.style.fontSize = '14px';
+        vtTitle.textContent = 'VirusTotal';
+        vtSection.appendChild(vtTitle);
+
+        const vtDescription = document.createElement('div');
+        vtDescription.style.fontSize = '12px';
+        vtDescription.style.color = '#8f98a0';
+        vtDescription.style.marginBottom = '12px';
+        vtDescription.textContent = t('settings.vtDescription') || 'Scan downloaded files for malware before installation. Get your free API key at virustotal.com';
+        vtSection.appendChild(vtDescription);
+
+        const vtInputContainer = document.createElement('div');
+        vtInputContainer.style.display = 'flex';
+        vtInputContainer.style.gap = '8px';
+        vtInputContainer.style.alignItems = 'center';
+
+        const vtInput = document.createElement('input');
+        vtInput.type = 'password';
+        vtInput.placeholder = t('settings.vtPlaceholder') || 'Enter VirusTotal API key...';
+        vtInput.value = vtStatus.apiKey;
+        vtInput.style.flex = '1';
+        vtInput.style.padding = '8px 12px';
+        vtInput.style.background = '#1a1d24';
+        vtInput.style.border = '1px solid #3d4450';
+        vtInput.style.borderRadius = '4px';
+        vtInput.style.color = '#ffffff';
+        vtInput.style.fontSize = '13px';
+        vtInputContainer.appendChild(vtInput);
+
+        const vtStatus$ = document.createElement('span');
+        vtStatus$.style.fontSize = '12px';
+        vtStatus$.style.whiteSpace = 'nowrap';
+        if (vtStatus.isEnabled) {
+            vtStatus$.textContent = '✓ ' + (t('settings.vtEnabled') || 'Enabled');
+            vtStatus$.style.color = '#5ba32b';
+        } else if (vtStatus.hasKey) {
+            vtStatus$.textContent = '⚠ ' + (t('settings.vtDisabled') || 'Disabled');
+            vtStatus$.style.color = '#f0ad4e';
+        } else {
+            vtStatus$.textContent = t('settings.vtNotConfigured') || 'Not configured';
+            vtStatus$.style.color = '#8f98a0';
+        }
+        vtInputContainer.appendChild(vtStatus$);
+
+        vtSection.appendChild(vtInputContainer);
+        content.appendChild(vtSection);
+
+        // Buttons
+        const cancelButton = createDialogButton(t('common.cancel'), 'secondary');
+        const saveButton = createDialogButton(t('common.save') || 'Save', 'primary');
+
+        const finish = () => {
+            close();
+            resolve();
+        };
+
+        cancelButton.addEventListener('click', finish);
+
+        saveButton.addEventListener('click', async () => {
+            const newKey = vtInput.value.trim();
+            
+            // Check if unchanged
+            if (newKey === vtStatus.apiKey) {
+                finish();
+                return;
+            }
+
+            // Validate: key format (VT keys are 64 hex characters, or empty to clear)
+            if (newKey && newKey.length !== 64) {
+                vtStatus$.textContent = '✗ ' + (t('settings.vtInvalidKey') || 'Invalid key format');
+                vtStatus$.style.color = '#d94040';
+                return;
+            }
+
+            try {
+                saveButton.disabled = true;
+                saveButton.textContent = t('common.saving') || 'Saving...';
+
+                const raw = await setVtApiKeyRpc({ api_key: newKey });
+                const result = normalizeBasicResponse(raw);
+
+                if (result.success) {
+                    vtStatus$.textContent = newKey ? ('✓ ' + (t('settings.vtEnabled') || 'Enabled')) : (t('settings.vtNotConfigured') || 'Not configured');
+                    vtStatus$.style.color = newKey ? '#5ba32b' : '#8f98a0';
+                    finish();
+                } else {
+                    vtStatus$.textContent = '✗ ' + (result.error || 'Failed to save');
+                    vtStatus$.style.color = '#d94040';
+                    saveButton.disabled = false;
+                    saveButton.textContent = t('common.save') || 'Save';
+                }
+            } catch (err) {
+                vtStatus$.textContent = '✗ Error';
+                vtStatus$.style.color = '#d94040';
+                saveButton.disabled = false;
+                saveButton.textContent = t('common.save') || 'Save';
+            }
+        });
+
+        actions.appendChild(cancelButton);
+        actions.appendChild(saveButton);
+    });
+};
+
 const showMirrorSelectionModal = async (initial: MirrorId = (currentMirror ?? 'default')): Promise<MirrorId | null> => {
     if (!document?.body) return initial;
 
@@ -1444,6 +1598,7 @@ const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): (
 
 const ADD_BTN_ID = "add-app-to-library-btn";
 const REMOVE_BTN_ID = "remove-app-from-library-btn";
+const SETTINGS_BTN_ID = "steam-app-inserter-settings-btn";
 const CONTAINER_SELECTOR = ".apphub_OtherSiteInfo";
 const WAIT_FOR_ELEMENT_TIMEOUT = 20000;
 const MUTATION_OBSERVER_THROTTLE_MS = 500;
@@ -1608,14 +1763,30 @@ export default async function WebkitMain() {
 
             document.getElementById(ADD_BTN_ID)?.remove();
             document.getElementById(REMOVE_BTN_ID)?.remove();
+            document.getElementById(SETTINGS_BTN_ID)?.remove();
+
+            // Settings button (gear icon)
+            const settingsBtn = document.createElement("button");
+            settingsBtn.id = SETTINGS_BTN_ID;
+            settingsBtn.type = "button";
+            settingsBtn.className = "btnv6_blue_hoverfade btn_medium";
+            settingsBtn.style.marginRight = "3px";
+            settingsBtn.innerHTML = '<span>⚙</span>';
+            settingsBtn.title = t('settings.title') || 'Settings';
+            settingsBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                await showSettingsDialog();
+            });
 
             const addBtn = document.createElement("button");
             addBtn.id = ADD_BTN_ID;
             addBtn.type = "button";
             addBtn.style.marginRight = "3px";
             addBtn.className = "btnv6_blue_hoverfade btn_medium";
+            
+            let removeBtn: HTMLButtonElement | null = null;
             if (isPirated) {
-                const removeBtn = document.createElement("button");
+                removeBtn = document.createElement("button");
                 removeBtn.id = REMOVE_BTN_ID;
                 removeBtn.type = "button";
                 removeBtn.style.marginRight = "3px";
@@ -1665,12 +1836,6 @@ export default async function WebkitMain() {
                     }
                 });
 
-                const last = container.lastElementChild;
-                if (last) {
-                    container.insertBefore(removeBtn, last);
-                } else {
-                    container.appendChild(removeBtn);
-                }
                 addBtn.innerHTML = buttonLabel('EDIT_DLC_LIBRARY');
             } else {
                 addBtn.innerHTML = buttonLabel('ADD_TO_LIBRARY');
@@ -1721,10 +1886,19 @@ export default async function WebkitMain() {
                 }
             });
 
+            // Insert buttons: [settings] [remove if pirated] [add/edit] before [last]
             const last = container.lastElementChild;
             if (last) {
+                container.insertBefore(settingsBtn, last);
+                if (removeBtn) {
+                    container.insertBefore(removeBtn, last);
+                }
                 container.insertBefore(addBtn, last);
             } else {
+                container.appendChild(settingsBtn);
+                if (removeBtn) {
+                    container.appendChild(removeBtn);
+                }
                 container.appendChild(addBtn);
             }
         } catch {

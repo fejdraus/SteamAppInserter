@@ -63,7 +63,7 @@ const tr = {
   },
   status: {
     preparing: "Dosyalar hazırlanıyor...",
-    downloading: "Manifestler indiriliyor...",
+    downloading: "İndiriliyor ve taranıyor...",
     merging: "DLC seçimleri birleştiriliyor...",
     removing: "Kütüphaneden kaldırılıyor...",
     success: "Hepsi tamam!",
@@ -124,6 +124,16 @@ const tr = {
     accountRequired: "Üçüncü taraf hesabı gerekli",
     onlineOnly: "Sadece çevrimiçi",
     hasOnline: "Çevrimiçi özellikleri var",
+  },
+
+  settings: {
+    title: "Ayarlar",
+    vtDescription: "İndirilen dosyaları kurulumdan önce kötü amaçlı yazılımlara karşı tara. Ücretsiz API anahtarınızı virustotal.com adresinden alın",
+    vtPlaceholder: "VirusTotal API anahtarını girin...",
+    vtEnabled: "Anahtar girildi",
+    vtDisabled: "Anahtar yanlış",
+    vtNotConfigured: "Anahtar girilmedi",
+    vtInvalidKey: "Geçersiz anahtar formatı (64 karakter gerekli)",
   },
 };
 

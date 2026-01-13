@@ -63,7 +63,7 @@ const ko = {
   },
   status: {
     preparing: "파일 준비 중...",
-    downloading: "매니페스트 다운로드 중...",
+    downloading: "다운로드 및 검사 중...",
     merging: "DLC 선택 병합 중...",
     removing: "라이브러리에서 제거 중...",
     success: "모든 작업 완료!",
@@ -124,6 +124,16 @@ const ko = {
     accountRequired: "타사 계정 필요",
     onlineOnly: "온라인 전용",
     hasOnline: "온라인 기능 있음",
+  },
+
+  settings: {
+    title: "설정",
+    vtDescription: "설치 전 다운로드한 파일의 악성코드 검사. virustotal.com에서 무료 API 키 받기",
+    vtPlaceholder: "VirusTotal API 키 입력...",
+    vtEnabled: "키 입력됨",
+    vtDisabled: "키가 잘못됨",
+    vtNotConfigured: "키 미입력",
+    vtInvalidKey: "잘못된 키 형식 (64자 필요)",
   },
 };
 

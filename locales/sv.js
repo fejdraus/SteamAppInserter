@@ -63,7 +63,7 @@ const sv = {
   },
   status: {
     preparing: "Förbereder filer...",
-    downloading: "Laddar ner manifest...",
+    downloading: "Laddar ner och skannar...",
     merging: "Slår ihop DLC-val...",
     removing: "Tar bort från bibliotek...",
     success: "Allt klart!",
@@ -124,6 +124,16 @@ const sv = {
     accountRequired: "Tredjepartskonto krävs",
     onlineOnly: "Endast online",
     hasOnline: "Har onlinefunktioner",
+  },
+
+  settings: {
+    title: "Inställningar",
+    vtDescription: "Skanna nedladdade filer efter skadlig programvara före installation. Hämta din gratis API-nyckel på virustotal.com",
+    vtPlaceholder: "Ange VirusTotal API-nyckel...",
+    vtEnabled: "Nyckel angiven",
+    vtDisabled: "Nyckel är felaktig",
+    vtNotConfigured: "Nyckel inte angiven",
+    vtInvalidKey: "Ogiltigt nyckelformat (64 tecken krävs)",
   },
 };
 

@@ -63,7 +63,7 @@ const ro = {
   },
   status: {
     preparing: "Se pregătesc fișierele...",
-    downloading: "Se descarcă manifestele...",
+    downloading: "Descărcare și scanare...",
     merging: "Se combină selecțiile DLC...",
     removing: "Se elimină din bibliotecă...",
     success: "Totul este gata!",
@@ -124,6 +124,16 @@ const ro = {
     accountRequired: "Necesită cont terț",
     onlineOnly: "Doar online",
     hasOnline: "Are funcții online",
+  },
+
+  settings: {
+    title: "Setări",
+    vtDescription: "Scanează fișierele descărcate pentru malware înainte de instalare. Obține cheia API gratuită pe virustotal.com",
+    vtPlaceholder: "Introduceți cheia API VirusTotal...",
+    vtEnabled: "Cheie introdusă",
+    vtDisabled: "Cheie incorectă",
+    vtNotConfigured: "Cheie neintrodusă",
+    vtInvalidKey: "Format cheie invalid (64 caractere necesare)",
   },
 };
 
