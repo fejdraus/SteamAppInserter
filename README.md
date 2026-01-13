@@ -126,6 +126,15 @@ This plugin is part of a three-component system:
 3. **Confirm** the removal dialog
 4. **Restart Steam** when prompted
 
+### Configuring VirusTotal (Optional)
+
+1. **Get API Key** - Create a free account at [VirusTotal](https://www.virustotal.com/) and [get your API key](https://docs.virustotal.com/docs/please-give-me-an-api-key)
+2. **Open Settings** - Click the **⚙** (gear) button on any Steam Store page
+3. **Enter Key** - Paste your 64-character API key in the VirusTotal field
+4. **Save** - Click "Save" to enable malware scanning
+
+> **Note:** VirusTotal scanning is optional. Without an API key, the plugin works normally but without malware checks.
+
 ---
 
 ## ⚠️ Requirements
